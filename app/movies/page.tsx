@@ -7,6 +7,14 @@ import TrailerModal from '../components/TrailerModal';
 import { PlayIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 
+const genreMapping: { [key: string]: number } = {
+  action: 28,
+  comedy: 35,
+  drama: 18,
+  'sci-fi': 878,
+  horror: 27
+};
+
 export default function MoviesPage() {
   const { trendingMovies, latestMovies, addToWatchlist, removeFromWatchlist, watchlist } = useMovies();
   const [activeCategory, setActiveCategory] = useState('all');
@@ -28,7 +36,8 @@ export default function MoviesPage() {
   const filteredMovies = (trendingMovies || [])
     .filter((movie: Movie) => {
       const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = activeCategory === 'all' || movie.genre?.includes(activeCategory);
+      const matchesCategory = activeCategory === 'all' || 
+        (movie.genre_ids && movie.genre_ids.includes(genreMapping[activeCategory]));
       return matchesSearch && matchesCategory;
     })
     .sort((a: Movie, b: Movie) => {
@@ -187,11 +196,14 @@ export default function MoviesPage() {
                     <div className="absolute inset-0 flex flex-col justify-end p-4">
                       <h3 className="mb-1 text-lg font-semibold">{movie.title}</h3>
                       <div className="flex flex-wrap gap-2 mb-2">
-                        {movie.genre?.map((g: string, index: number) => (
-                          <span key={index} className="px-2 py-1 text-xs bg-emerald-500/20 text-emerald-400 rounded-md">
-                            {g}
-                          </span>
-                        ))}
+                        {movie.genre_ids?.map((genreId: number) => {
+                          const genre = Object.entries(genreMapping).find(([_, id]) => id === genreId);
+                          return genre ? (
+                            <span key={genreId} className="px-2 py-1 text-xs bg-emerald-500/20 text-emerald-400 rounded-md">
+                              {genre[0].charAt(0).toUpperCase() + genre[0].slice(1)}
+                            </span>
+                          ) : null;
+                        })}
                       </div>
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-sm text-gray-300">{movie.release_date?.split('-')[0]}</span>

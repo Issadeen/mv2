@@ -98,3 +98,26 @@ export const searchContent = async (query: string, type: 'movie' | 'multi' = 'mo
     vote_average: movie.vote_average
   }));
 };
+
+export const fetchStreamingUrls = async (tmdbId: number) => {
+  try {
+    const response = await axios.get(`https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`);
+    return {
+      embedUrl: `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`,
+      isEmbed: true
+    };
+  } catch (error) {
+    console.error('Error fetching streaming URLs:', error);
+    return null;
+  }
+};
+
+export const fetchSimilarMovies = async (movieId: number) => {
+  const { data } = await tmdbApi.get<TMDBResponse<Movie>>(`/movie/${movieId}/similar`);
+  return data.results;
+};
+
+export const fetchRecommendedMovies = async (movieId: number) => {
+  const { data } = await tmdbApi.get<TMDBResponse<Movie>>(`/movie/${movieId}/recommendations`);
+  return data.results;
+};

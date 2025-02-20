@@ -8,6 +8,7 @@ import {
   searchContent 
 } from '../services/tmdb';
 
+// Update the Movie interface to properly handle genres and genre_ids
 export interface Movie {
   id: number;
   title: string;
@@ -17,7 +18,9 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   genre_ids?: number[];
+  genres?: Array<{ id: number; name: string }>;
   media_type?: string;
+  runtime?: number;
 }
 
 interface MoviesContextType {

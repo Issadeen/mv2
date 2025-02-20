@@ -9,6 +9,7 @@ import {
 } from '../services/tmdb';
 
 export interface Movie {
+  genre?: any;
   id: number;
   title: string;
   overview: string;

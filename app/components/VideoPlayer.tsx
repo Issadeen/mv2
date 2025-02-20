@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { FaPlay, FaPause, FaExpand, FaCompress, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
+import { FaPlay, FaPause, FaExpand, FaCompress, FaVolumeUp, FaVolumeMute, FaInfoCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -12,6 +12,14 @@ interface VideoPlayerProps {
   isOpen?: boolean;
   isEmbed?: boolean;
   isLoading?: boolean;
+  onProgress?: (progress: number) => void;
+  onTimeUpdate?: (time: number) => void;
+  initialTime?: number;
+  showInfo?: boolean;
+  onToggleInfo?: () => void;
+  content?: any;
+  autoPlay?: boolean;
+  onSavePlaybackState?: (time: number) => void;
 }
 
 const getFullscreenElement = (): Element | null => {
@@ -47,7 +55,45 @@ const exitFullscreen = async () => {
   }
 };
 
-export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed, isLoading }: VideoPlayerProps) {
+const InfoOverlay = ({ content, isVisible, onClose }: { 
+  content: any; 
+  isVisible: boolean; 
+  onClose: () => void;
+}) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: isVisible ? 1 : 0 }}
+    transition={{ duration: 0.3 }}
+    className={`fixed inset-0 bg-black/80 z-50 ${isVisible ? '' : 'pointer-events-none'}`}
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ y: 50 }}
+      animate={{ y: 0 }}
+      className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent"
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Content details */}
+    </motion.div>
+  </motion.div>
+);
+
+export default function VideoPlayer({ 
+  videoUrl, 
+  title, 
+  onClose, 
+  isOpen, 
+  isEmbed, 
+  isLoading,
+  onProgress,
+  onTimeUpdate,
+  initialTime = 0,
+  showInfo = false,
+  onToggleInfo,
+  content,
+  autoPlay = true,
+  onSavePlaybackState,
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -56,6 +102,9 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isInfoVisible, setIsInfoVisible] = useState(false);
+  const [isControlsVisible, setIsControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     if (!isEmbed && videoRef.current) {
@@ -110,6 +159,110 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = () => {
+      setIsControlsVisible(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      controlsTimeoutRef.current = setTimeout(() => {
+        if (!isPlaying) return;
+        setIsControlsVisible(false);
+      }, 3000);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!isEmbed && videoRef.current && initialTime) {
+      videoRef.current.currentTime = initialTime;
+    }
+  }, [initialTime, isEmbed]);
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current) return;
+    const currentTime = videoRef.current.currentTime;
+    const duration = videoRef.current.duration;
+    const progress = (currentTime / duration) * 100;
+    setProgress(progress);
+    setCurrentTime(currentTime);
+    onProgress?.(progress);
+    onTimeUpdate?.(currentTime);
+  };
+
+  const handleKeyPress = (e: KeyboardEvent) => {
+    switch(e.key) {
+      case ' ':
+        e.preventDefault();
+        togglePlay();
+        break;
+      case 'f':
+        toggleFullscreen();
+        break;
+      case 'm':
+        toggleMute();
+        break;
+      case 'ArrowRight':
+        if (videoRef.current) {
+          videoRef.current.currentTime += 10;
+        }
+        break;
+      case 'ArrowLeft':
+        if (videoRef.current) {
+          videoRef.current.currentTime -= 10;
+        }
+        break;
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
+
+  // Auto-play when ready
+  useEffect(() => {
+    if (autoPlay && videoRef.current && !isEmbed) {
+      videoRef.current.play().catch(error => {
+        console.error("Autoplay failed:", error);
+      });
+    }
+  }, [autoPlay, isEmbed]);
+
+  // Save playback state periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (videoRef.current && onSavePlaybackState) {
+        onSavePlaybackState(videoRef.current.currentTime);
+      }
+    }, 5000); // Save every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [onSavePlaybackState]);
+
+  // Handle visibility change to pause/play
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && videoRef.current) {
+        videoRef.current.pause();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -171,20 +324,23 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-black group">
+    <div 
+      ref={containerRef} 
+      className={`relative w-full h-full bg-black group ${
+        isControlsVisible ? '' : 'cursor-none'
+      }`}
+    >
       <video
         ref={videoRef}
         src={videoUrl}
         className="w-full h-full"
-        onTimeUpdate={() => {
-          if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
-            setProgress((videoRef.current.currentTime / videoRef.current.duration) * 100);
-          }
-        }}
+        onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
+            if (initialTime) {
+              videoRef.current.currentTime = initialTime;
+            }
           }
         }}
         onClick={togglePlay}
@@ -192,11 +348,30 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
         playsInline
       />
 
-      {/* Enhanced Controls Overlay */}
-      <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/50 via-transparent to-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      {/* Controls Overlay */}
+      <motion.div
+        initial={false}
+        animate={{ opacity: isControlsVisible ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/50 via-transparent to-black/50"
+      >
         {/* Top Bar */}
         <div className="flex justify-between items-center p-4">
-          <h2 className="text-xl font-semibold text-white drop-shadow-lg truncate">{title}</h2>
+          <motion.h2 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-xl font-semibold text-white drop-shadow-lg truncate flex items-center gap-2"
+          >
+            {title}
+            {content && (
+              <button
+                onClick={() => onToggleInfo?.()}
+                className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+              >
+                <FaInfoCircle className="w-5 h-5" />
+              </button>
+            )}
+          </motion.h2>
           {onClose && (
             <button
               onClick={onClose}
@@ -206,11 +381,11 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
             </button>
           )}
         </div>
-        
+
         {/* Center Play Button */}
         <div className="absolute inset-0 flex items-center justify-center">
           <AnimatePresence>
-            {!isPlaying && (
+            {!isPlaying && isControlsVisible && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -223,7 +398,7 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
             )}
           </AnimatePresence>
         </div>
-        
+
         {/* Bottom Controls */}
         <div className="p-4 space-y-2">
           {/* Progress Bar */}
@@ -241,8 +416,9 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
               className="absolute h-full bg-emerald-500"
               style={{ width: `${progress}%` }}
               transition={{ duration: 0.1 }}
-            />
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-emerald-400 rounded-full transform scale-0 group-hover:scale-100 transition-transform" />
+            >
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-emerald-400 rounded-full transform scale-0 group-hover:scale-100 transition-transform" />
+            </motion.div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -259,19 +435,58 @@ export default function VideoPlayer({ videoUrl, title, onClose, isOpen, isEmbed,
               >
                 {isMuted ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
               </button>
-              <span className="text-sm font-medium">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.currentTime -= 10;
+                    }
+                  }}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  -10s
+                </button>
+                <span className="text-sm font-medium">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.currentTime += 10;
+                    }
+                  }}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  +10s
+                </button>
+              </div>
             </div>
-            <button 
-              onClick={toggleFullscreen} 
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            >
-              {isFullscreen ? <FaCompress className="w-5 h-5" /> : <FaExpand className="w-5 h-5" />}
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => onToggleInfo?.()}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <FaInfoCircle className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={toggleFullscreen} 
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                {isFullscreen ? <FaCompress className="w-5 h-5" /> : <FaExpand className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Info Overlay */}
+      {content && (
+        <InfoOverlay
+          content={content}
+          isVisible={showInfo}
+          onClose={() => onToggleInfo?.()}
+        />
+      )}
     </div>
   );
 }

@@ -8,19 +8,52 @@ import {
   searchContent 
 } from '../services/tmdb';
 
-// Update the Movie interface to properly handle genres and genre_ids
-export interface Movie {
+// Add these interfaces at the top
+interface StreamingInfo {
+  embedUrl: string;
+  isEmbed: boolean;
+  currentTime?: number;
+  progress?: number;
+}
+
+interface PlaybackState {
+  selectedSeason?: number;
+  selectedEpisode?: number;
+  currentTime: number;
+}
+
+// Update Media interfaces
+export interface Media {
   id: number;
-  title: string;
+  title?: string;
+  name?: string;  // For TV shows
   overview: string;
   poster_path: string;
   backdrop_path: string;
-  release_date: string;
+  release_date?: string;
+  first_air_date?: string;  // For TV shows
   vote_average: number;
   genre_ids?: number[];
   genres?: Array<{ id: number; name: string }>;
-  media_type?: string;
+  media_type?: 'movie' | 'tv';
   runtime?: number;
+  streaming?: StreamingInfo;
+  playback?: PlaybackState;
+}
+
+export interface Movie extends Media {
+  title: string;
+  release_date: string;
+}
+
+export interface TVShow extends Media {
+  name: string;
+  first_air_date: string;
+  seasons?: Array<{
+    season_number: number;
+    episode_count: number;
+    name: string;
+  }>;
 }
 
 interface MoviesContextType {
@@ -29,11 +62,15 @@ interface MoviesContextType {
   popularMovies: Movie[];
   topRatedMovies: Movie[];
   upcomingMovies: Movie[];
-  watchlist: Movie[];
+  tvShows: TVShow[];
+  popularTVShows: TVShow[];
+  watchlist: (Movie | TVShow)[];
   isLoading: boolean;
   searchMovies: (query: string) => Promise<void>;
-  addToWatchlist: (movie: Movie) => void;
-  removeFromWatchlist: (movieId: number) => void;
+  addToWatchlist: (media: Movie | TVShow) => void;
+  removeFromWatchlist: (mediaId: number) => void;
+  updatePlaybackState: (mediaId: number, state: PlaybackState) => void;
+  getPlaybackState: (mediaId: number) => PlaybackState | undefined;
 }
 
 const MoviesContext = createContext<MoviesContextType | undefined>(undefined);
@@ -44,17 +81,23 @@ export function MoviesProvider({ children }: { children: React.ReactNode }) {
   const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
   const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
   const [upcomingMovies, setUpcomingMovies] = useState<Movie[]>([]);
-  const [watchlist, setWatchlist] = useState<Movie[]>([]);
+  const [tvShows, setTvShows] = useState<TVShow[]>([]);
+  const [popularTVShows, setPopularTVShows] = useState<TVShow[]>([]);
+  const [watchlist, setWatchlist] = useState<(Movie | TVShow)[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [playbackStates, setPlaybackStates] = useState<Record<number, PlaybackState>>({});
 
   useEffect(() => {
-    const fetchMovies = async () => {
+    const fetchContent = async () => {
       try {
-        const [latest, popular, topRated, upcoming] = await Promise.all([
+        const [latest, popular, topRated, upcoming, tvPopular] = await Promise.all([
           fetchLatestMovies(),
           fetchPopularMovies(),
           fetchTopRatedMovies(),
           fetchUpcomingMovies(),
+          fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/tv/popular?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`)
+            .then(res => res.json())
+            .then(data => data.results)
         ]);
 
         setLatestMovies(latest);
@@ -62,14 +105,15 @@ export function MoviesProvider({ children }: { children: React.ReactNode }) {
         setPopularMovies(popular);
         setTopRatedMovies(topRated);
         setUpcomingMovies(upcoming);
+        setPopularTVShows(tvPopular);
       } catch (error) {
-        console.error('Error fetching movies:', error);
+        console.error('Error fetching content:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchMovies();
+    fetchContent();
   }, []);
 
   const searchMovies = async (query: string) => {
@@ -78,12 +122,23 @@ export function MoviesProvider({ children }: { children: React.ReactNode }) {
     setTrendingMovies(results);
   };
 
-  const addToWatchlist = (movie: Movie) => {
-    setWatchlist(prev => [...prev, movie]);
+  const addToWatchlist = (media: Movie | TVShow) => {
+    setWatchlist(prev => [...prev, media]);
   };
 
-  const removeFromWatchlist = (movieId: number) => {
-    setWatchlist(prev => prev.filter(movie => movie.id !== movieId));
+  const removeFromWatchlist = (mediaId: number) => {
+    setWatchlist(prev => prev.filter(media => media.id !== mediaId));
+  };
+
+  const updatePlaybackState = (mediaId: number, state: PlaybackState) => {
+    setPlaybackStates(prev => ({
+      ...prev,
+      [mediaId]: state
+    }));
+  };
+
+  const getPlaybackState = (mediaId: number) => {
+    return playbackStates[mediaId];
   };
 
   return (
@@ -93,11 +148,15 @@ export function MoviesProvider({ children }: { children: React.ReactNode }) {
       popularMovies,
       topRatedMovies,
       upcomingMovies,
+      tvShows,
+      popularTVShows,
       watchlist,
       isLoading,
       searchMovies,
       addToWatchlist,
       removeFromWatchlist,
+      updatePlaybackState,
+      getPlaybackState,
     }}>
       {children}
     </MoviesContext.Provider>

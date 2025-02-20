@@ -105,7 +105,7 @@ export default function MyListPage() {
                     <div className="flex-grow"></div>
                     <div className="flex gap-2 mt-4">
                       <button 
-                        onClick={() => openTrailer(item.id, item.title)}
+                        onClick={() => item.title && openTrailer(item.id, item.title)}
                         className="flex items-center px-3 py-1.5 text-sm font-medium text-white transition-colors rounded-md bg-emerald-500 hover:bg-emerald-600"
                       >
                         <FaPlay className="w-3 h-3 mr-2" />

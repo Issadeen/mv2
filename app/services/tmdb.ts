@@ -99,17 +99,47 @@ export const searchContent = async (query: string, type: 'movie' | 'multi' = 'mo
   }));
 };
 
-export const fetchStreamingUrls = async (tmdbId: number) => {
+export const fetchStreamingUrls = async (
+  tmdbId: number, 
+  mediaType: 'movie' | 'tv' = 'movie',
+  season?: number,
+  episode?: number
+) => {
   try {
-    const response = await axios.get(`https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`);
+    const url = mediaType === 'tv'
+      ? `https://vidsrc.xyz/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`
+      : `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`;
+
+    // Return the URL directly without checking its existence
     return {
-      embedUrl: `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`,
+      embedUrl: url,
       isEmbed: true
     };
   } catch (error) {
-    console.error('Error fetching streaming URLs:', error);
+    console.error('Error creating streaming URL:', error);
     return null;
   }
+};
+
+export const fetchSimilarContent = async (id: number, type: 'movie' | 'tv' = 'movie') => {
+  const { data } = await tmdbApi.get<TMDBResponse<any>>(`/${type}/${id}/similar`);
+  return data.results;
+};
+
+export const fetchRecommendedContent = async (id: number, type: 'movie' | 'tv' = 'movie') => {
+  const { data } = await tmdbApi.get<TMDBResponse<any>>(`/${type}/${id}/recommendations`);
+  return data.results;
+};
+
+// Add TV show specific endpoints
+export const fetchTVShowDetails = async (id: number) => {
+  const { data } = await tmdbApi.get(`/tv/${id}`);
+  return data;
+};
+
+export const fetchTVShowSeasonDetails = async (id: number, seasonNumber: number) => {
+  const { data } = await tmdbApi.get(`/tv/${id}/season/${seasonNumber}`);
+  return data;
 };
 
 export const fetchSimilarMovies = async (movieId: number) => {

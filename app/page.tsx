@@ -80,7 +80,7 @@ export default function Home() {
               <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-t from-slate-900/95 via-slate-900/50 to-transparent group-hover:opacity-100">
                 <div className="absolute top-2 right-2">
                   <button
-                    onClick={() => watchlist.some((m: Movie) => m.id === movie.id) 
+                    onClick={() => watchlist.some((m) => 'title' in m && m.id === movie.id) 
                       ? removeFromWatchlist(movie.id)
                       : addToWatchlist(movie)
                     }

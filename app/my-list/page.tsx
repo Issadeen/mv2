@@ -4,6 +4,9 @@ import { useMovies } from '../context/MoviesContext';
 import { FaHeart, FaTrash, FaPlay } from 'react-icons/fa';
 import TrailerModal from '../components/TrailerModal';
 import { useState } from 'react';
+import type { Movie } from '../context/MoviesContext';
+
+// Remove the local Movie interface since we're importing it from MoviesContext
 
 export default function MyListPage() {
   const { watchlist, removeFromWatchlist } = useMovies();
@@ -79,10 +82,10 @@ export default function MyListPage() {
                   </div>
                   <div className="flex flex-col flex-grow">
                     <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                    {item.genre_ids && (
+                    {item.genre_ids && item.genre_ids.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2">
                         {item.genre_ids.map((genreId: number, index: number) => (
-                          <span key={index} className="px-2 py-1 text-xs bg-emerald-500/20 text-emerald-400 rounded-md">
+                          <span key={genreId} className="px-2 py-1 text-xs bg-emerald-500/20 text-emerald-400 rounded-md">
                             {genreId}
                           </span>
                         ))}

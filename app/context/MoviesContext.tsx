@@ -9,7 +9,6 @@ import {
 } from '../services/tmdb';
 
 export interface Movie {
-  genre?: any;
   id: number;
   title: string;
   overview: string;
@@ -17,6 +16,8 @@ export interface Movie {
   backdrop_path: string;
   release_date: string;
   vote_average: number;
+  genre_ids?: number[];
+  media_type?: string;
 }
 
 interface MoviesContextType {

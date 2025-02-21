@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from './LoadingSpinner';
 
 interface VideoPlayerProps {
-  videoUrl: string;
+  videoUrl: string | null;
   title: string;
   onClose?: () => void;
   isOpen?: boolean;
@@ -21,6 +21,7 @@ interface VideoPlayerProps {
   autoPlay?: boolean;
   onSavePlaybackState?: (time: number) => void;
   onEpisodeComplete?: () => void;
+  error?: string;  // Add error prop
 }
 
 const getFullscreenElement = (): Element | null => {
@@ -110,10 +111,15 @@ export default function VideoPlayer({
   autoPlay = true,
   onSavePlaybackState,
   onEpisodeComplete,
+  error, // Add error prop
 }: VideoPlayerProps) {
+
+  // Don't render video element if no URL
+  if (!videoUrl) return null;
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -317,6 +323,23 @@ export default function VideoPlayer({
             >
               <LoadingSpinner size="lg" />
             </motion.div>
+          ) : error || !videoUrl ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/80"
+            >
+              <div className="text-center px-4">
+                <p className="text-red-400 mb-4">{error || "This content is currently unavailable"}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            </motion.div>
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
@@ -330,7 +353,7 @@ export default function VideoPlayer({
                 allowFullScreen
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 style={{ border: 'none' }}
-                onError={() => setError('Failed to load video')}
+                onError={() => setErrorState('Failed to load video')}
               />
               
               {/* Fullscreen button */}
@@ -349,10 +372,10 @@ export default function VideoPlayer({
                 )}
               </button>
 
-              {error && (
+              {errorState && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/80">
                   <div className="text-center">
-                    <p className="text-red-400 mb-4">{error}</p>
+                    <p className="text-red-400 mb-4">{errorState}</p>
                     <button
                       onClick={() => window.location.reload()}
                       className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"

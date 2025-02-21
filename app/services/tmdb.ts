@@ -106,18 +106,44 @@ export const fetchStreamingUrls = async (
   episode?: number
 ) => {
   try {
-    const url = mediaType === 'tv'
+    // Try primary source first
+    const primaryUrl = mediaType === 'tv'
       ? `https://vidsrc.xyz/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`
       : `https://vidsrc.xyz/embed/movie?tmdb=${tmdbId}`;
 
-    // Return the URL directly without checking its existence
-    return {
-      embedUrl: url,
-      isEmbed: true
-    };
+    // Try alternative source if primary fails
+    const fallbackUrl = mediaType === 'tv'
+      ? `https://vidsrc.to/embed/tv/${tmdbId}/${season}/${episode}`
+      : `https://vidsrc.to/embed/movie/${tmdbId}`;
+
+    // Check if either URL is accessible
+    try {
+      const response = await fetch(primaryUrl, { method: 'HEAD' });
+      if (response.ok) {
+        return { embedUrl: primaryUrl, isEmbed: true };
+      }
+    } catch (error) {
+      console.warn('Primary source unavailable, trying fallback...');
+    }
+
+    // Try fallback URL
+    try {
+      const response = await fetch(fallbackUrl, { method: 'HEAD' });
+      if (response.ok) {
+        return { embedUrl: fallbackUrl, isEmbed: true };
+      }
+    } catch (error) {
+      console.warn('Fallback source unavailable');
+    }
+
+    throw new Error('No available streaming sources found');
   } catch (error) {
     console.error('Error creating streaming URL:', error);
-    return null;
+    return {
+      error: 'Content is temporarily unavailable. Please try again later or choose a different title.',
+      embedUrl: null,
+      isEmbed: true
+    };
   }
 };
 

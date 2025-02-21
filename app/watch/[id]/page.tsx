@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaHeart, FaRegHeart, FaPlay, FaClock, FaStar, FaCalendar } from 'react-icons/fa';
 import TrailerModal from '@/app/components/TrailerModal';
 import VideoPlayer from '@/app/components/VideoPlayer';
-import { fetchStreamingUrls, fetchSimilarMovies, fetchRecommendedMovies } from '@/app/services/tmdb';
+import { fetchStreamingUrls, fetchSimilarContent, fetchRecommendedContent } from '@/app/services/tmdb';
 import ErrorDisplay from '@/app/components/ErrorDisplay';
 import LoadingSpinner from '@/app/components/LoadingSpinner';
 import { useRouter, useParams } from 'next/navigation';
@@ -81,6 +81,12 @@ const MovieSection = ({ title, movies, getMediaLink, router }: MovieSectionProps
   </div>
 );
 
+interface StreamingData {
+  embedUrl: string | null;
+  isEmbed: boolean;
+  error?: string;
+}
+
 export default function WatchPage() {
   const router = useRouter();
   const params = useParams();
@@ -88,9 +94,9 @@ export default function WatchPage() {
   const getMediaLink = (id: number, type?: string) => `/watch/${id}?type=${type || 'movie'}`;
   const id = params.id as string;
   const searchParams = new URLSearchParams(window.location.search);
-  const mediaType = searchParams.get('type') || 'movie';
+  const mediaType = (searchParams.get('type') || 'movie') as 'movie' | 'tv';
   const [movie, setMovie] = useState<Movie | null>(null);
-  const [streamingData, setStreamingData] = useState<{ embedUrl: string; isEmbed: boolean } | null>(null);
+  const [streamingData, setStreamingData] = useState<StreamingData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -145,10 +151,10 @@ export default function WatchPage() {
         
         setLoadingProgress(80);
 
-        // Fetch similar and recommended content
+        // Fetch similar and recommended content based on media type
         const [similar, recommended] = await Promise.all([
-          fetchSimilarMovies(Number(id)),
-          fetchRecommendedMovies(Number(id))
+          fetchSimilarContent(Number(id), mediaType),
+          fetchRecommendedContent(Number(id), mediaType)
         ]);
 
         setSimilarMovies(similar);

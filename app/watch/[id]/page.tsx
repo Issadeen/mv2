@@ -167,7 +167,7 @@ export default function WatchPage() {
 
   return (
     <div className="relative bg-slate-900 min-h-screen">
-      {/* Video Player Section - Full width and proper height */}
+      {/* Video Player Section - Fixed to top only initially */}
       <div className="relative w-full bg-black">
         <div className="w-full aspect-video max-h-[85vh]">
           {streamingData ? (
@@ -193,85 +193,90 @@ export default function WatchPage() {
         </div>
       </div>
 
-      {/* Content Information with dark theme */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-100">
-        <div className="flex flex-col gap-6">
-          {/* Episode Selection for TV Shows */}
-          {content?.media_type === 'tv' && content.seasons && (
-            <div className="flex flex-wrap gap-4 bg-slate-800/50 p-4 rounded-lg">
-              <select
-                value={selectedSeason}
-                onChange={(e) => setSelectedSeason(Number(e.target.value))}
-                className="px-4 py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white"
-              >
-                {content.seasons.map((season) => (
-                  <option key={season.season_number} value={season.season_number}>
-                    Season {season.season_number} - {season.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedEpisode}
-                onChange={(e) => setSelectedEpisode(Number(e.target.value))}
-                className="px-4 py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white"
-              >
-                {Array.from({ length: content.seasons[selectedSeason - 1]?.episode_count || 0 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    Episode {i + 1}
-                  </option>
-                ))}
-              </select>
+      {/* Content Information - Always visible below player */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8 text-gray-100">
+        {/* Episode Selection for TV Shows */}
+        {content?.media_type === 'tv' && content.seasons && (
+          <div className="mb-4 flex flex-wrap gap-2 sm:gap-4 bg-slate-800/50 p-2 sm:p-4 rounded-lg">
+            <select
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(Number(e.target.value))}
+              className="flex-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white text-sm sm:text-base"
+            >
+              {content.seasons.map((season) => (
+                <option key={season.season_number} value={season.season_number}>
+                  Season {season.season_number}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedEpisode}
+              onChange={(e) => setSelectedEpisode(Number(e.target.value))}
+              className="flex-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white text-sm sm:text-base"
+            >
+              {Array.from({ length: content.seasons[selectedSeason - 1]?.episode_count || 0 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Ep {i + 1}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Content Details */}
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-6 mb-4">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-4 text-white">
+            {content?.title || content?.name}
+          </h1>
+
+          <div className="flex flex-wrap gap-2 sm:gap-4 mb-2 sm:mb-4 text-gray-300 text-sm sm:text-base">
+            <div className="flex items-center text-emerald-400">
+              <FaStar className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+              <span className="font-semibold">{content?.vote_average?.toFixed(1)}</span>
             </div>
-          )}
-
-          {/* Content Details */}
-          <div className="bg-slate-800/50 rounded-lg p-6">
-            <h1 className="text-4xl font-bold mb-4 text-white">
-              {content?.title || content?.name}
-            </h1>
-
-            <div className="flex flex-wrap gap-4 mb-4 text-gray-300">
-              <div className="flex items-center text-emerald-400">
-                <FaStar className="w-5 h-5 mr-2" />
-                <span className="text-lg font-semibold">{content?.vote_average?.toFixed(1)}</span>
-              </div>
+            <div className="flex items-center">
+              <FaCalendar className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+              <span>
+                {content?.release_date
+                  ? new Date(content.release_date).getFullYear()
+                  : content?.first_air_date
+                  ? new Date(content.first_air_date).getFullYear()
+                  : 'N/A'}
+              </span>
+            </div>
+            {content?.runtime && (
               <div className="flex items-center">
-                <FaCalendar className="w-5 h-5 mr-2" />
-                <span>
-                  {content?.release_date
-                    ? new Date(content.release_date).getFullYear()
-                    : content?.first_air_date
-                    ? new Date(content.first_air_date).getFullYear()
-                    : 'N/A'}
-                </span>
+                <FaClock className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                <span>{Math.floor(content.runtime / 60)}h {content.runtime % 60}m</span>
               </div>
-              {content?.runtime && (
-                <div className="flex items-center">
-                  <FaClock className="w-5 h-5 mr-2" />
-                  <span>{Math.floor(content.runtime / 60)}h {content.runtime % 60}m</span>
-                </div>
-              )}
-            </div>
+            )}
+          </div>
 
-            <p className="text-gray-300 text-lg leading-relaxed mb-6">
+          {/* Collapsible overview on mobile */}
+          <details className="sm:hidden mb-2">
+            <summary className="text-emerald-400 cursor-pointer">Show description</summary>
+            <p className="text-gray-300 text-sm leading-relaxed mt-2">
               {content?.overview}
             </p>
+          </details>
+          <p className="hidden sm:block text-gray-300 text-lg leading-relaxed mb-4 sm:mb-6">
+            {content?.overview}
+          </p>
 
-            <div className="flex flex-wrap gap-2 mb-6">
-              {content?.genres?.map((genre: any) => (
-                <span 
-                  key={genre.id}
-                  className="px-3 py-1 text-sm bg-emerald-500/20 text-emerald-400 rounded-full"
-                >
-                  {genre.name}
-                </span>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1 sm:gap-2">
+            {content?.genres?.map((genre: any) => (
+              <span 
+                key={genre.id}
+                className="px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm bg-emerald-500/20 text-emerald-400 rounded-full"
+              >
+                {genre.name}
+              </span>
+            ))}
           </div>
         </div>
 
         {/* Similar and Recommended Content */}
-        <div className="mt-8 space-y-8">
+        <div className="space-y-4 sm:space-y-8">
           {similarMovies.length > 0 && (
             <MovieSection 
               title={`Similar ${content?.media_type === 'tv' ? 'Shows' : 'Movies'}`} 

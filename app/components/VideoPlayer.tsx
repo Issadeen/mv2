@@ -73,7 +73,22 @@ const InfoOverlay = ({ content, isVisible, onClose }: {
       className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent"
       onClick={e => e.stopPropagation()}
     >
-      {/* Content details */}
+      <div className="max-w-3xl mx-auto">
+        <h2 className="text-2xl font-bold mb-4">{content.title || content.name}</h2>
+        <p className="text-gray-300 mb-4">{content.overview}</p>
+        {content.genres && (
+          <div className="flex flex-wrap gap-2">
+            {content.genres.map((genre: any) => (
+              <span 
+                key={genre.id}
+                className="px-3 py-1 text-sm bg-emerald-500/20 text-emerald-400 rounded-full"
+              >
+                {genre.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </motion.div>
   </motion.div>
 );
@@ -263,7 +278,7 @@ export default function VideoPlayer({
   return (
     <div 
       ref={containerRef} 
-      className={`relative w-full h-full bg-black group ${
+      className={`relative w-full h-full bg-black group touch-none ${
         isControlsVisible ? '' : 'cursor-none'
       }`}
     >
@@ -281,45 +296,46 @@ export default function VideoPlayer({
           }
         }}
         onClick={togglePlay}
+        onTouchEnd={togglePlay}
         controlsList="nodownload"
         playsInline
       />
 
-      {/* Controls Overlay */}
+      {/* Controls Overlay - Mobile Optimized */}
       <motion.div
         initial={false}
         animate={{ opacity: isControlsVisible ? 1 : 0 }}
         transition={{ duration: 0.2 }}
         className="absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/50 via-transparent to-black/50"
       >
-        {/* Top Bar */}
-        <div className="flex justify-between items-center p-4">
+        {/* Top Bar - Compact for Mobile */}
+        <div className="flex justify-between items-center p-2 sm:p-4">
           <motion.h2 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-xl font-semibold text-white drop-shadow-lg truncate flex items-center gap-2"
+            className="text-base sm:text-xl font-semibold text-white drop-shadow-lg truncate flex items-center gap-2 max-w-[70%]"
           >
             {title}
             {content && (
               <button
                 onClick={() => onToggleInfo?.()}
-                className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                className="p-1.5 sm:p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
               >
-                <FaInfoCircle className="w-5 h-5" />
+                <FaInfoCircle className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             )}
           </motion.h2>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
             >
-              <XMarkIcon className="w-6 h-6" />
+              <XMarkIcon className="w-4 h-4 sm:w-6 sm:h-6" />
             </button>
           )}
         </div>
 
-        {/* Center Play Button */}
+        {/* Center Play Button - Adjusted Size for Mobile */}
         <div className="absolute inset-0 flex items-center justify-center">
           <AnimatePresence>
             {!isPlaying && isControlsVisible && (
@@ -328,19 +344,19 @@ export default function VideoPlayer({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.5 }}
                 onClick={togglePlay}
-                className="w-20 h-20 flex items-center justify-center rounded-full bg-emerald-500/80 hover:bg-emerald-500 transition-colors"
+                className="w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center rounded-full bg-emerald-500/80 hover:bg-emerald-500 transition-colors"
               >
-                <FaPlay className="w-8 h-8 ml-1" />
+                <FaPlay className="w-6 h-6 sm:w-8 sm:h-8 ml-1" />
               </motion.button>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Bottom Controls */}
-        <div className="p-4 space-y-2">
-          {/* Progress Bar */}
+        {/* Bottom Controls - Mobile Optimized */}
+        <div className="p-2 sm:p-4 space-y-1 sm:space-y-2">
+          {/* Progress Bar - Larger touch target */}
           <div 
-            className="relative h-1.5 bg-white/20 cursor-pointer rounded-full overflow-hidden" 
+            className="relative h-2 sm:h-1.5 bg-white/20 cursor-pointer rounded-full overflow-hidden" 
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               const pos = (e.clientX - rect.left) / rect.width;
@@ -354,62 +370,36 @@ export default function VideoPlayer({
               style={{ width: `${progress}%` }}
               transition={{ duration: 0.1 }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-emerald-400 rounded-full transform scale-0 group-hover:scale-100 transition-transform" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-3 sm:h-3 bg-emerald-400 rounded-full transform scale-0 group-hover:scale-100 transition-transform" />
             </motion.div>
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button 
                 onClick={togglePlay} 
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors"
               >
-                {isPlaying ? <FaPause className="w-5 h-5" /> : <FaPlay className="w-5 h-5" />}
+                {isPlaying ? <FaPause className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaPlay className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
               <button 
                 onClick={toggleMute} 
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors"
               >
-                {isMuted ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
+                {isMuted ? <FaVolumeMute className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaVolumeUp className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    if (videoRef.current) {
-                      videoRef.current.currentTime -= 10;
-                    }
-                  }}
-                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  -10s
-                </button>
-                <span className="text-sm font-medium">
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <span className="text-xs sm:text-sm font-medium">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
-                <button
-                  onClick={() => {
-                    if (videoRef.current) {
-                      videoRef.current.currentTime += 10;
-                    }
-                  }}
-                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  +10s
-                </button>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <button
-                onClick={() => onToggleInfo?.()}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              >
-                <FaInfoCircle className="w-5 h-5" />
-              </button>
-              <button 
                 onClick={toggleFullscreen} 
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors"
               >
-                {isFullscreen ? <FaCompress className="w-5 h-5" /> : <FaExpand className="w-5 h-5" />}
+                {isFullscreen ? <FaCompress className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaExpand className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
           </div>

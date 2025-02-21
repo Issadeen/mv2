@@ -5,50 +5,53 @@ import {
   fetchPopularMovies, 
   fetchTopRatedMovies, 
   fetchUpcomingMovies,
-  searchContent 
+  fetchPopularTVShows,
+  fetchTopRatedTVShows,
+  fetchTrendingTVShows,
+  fetchLatestTVShows
 } from '../services/tmdb';
 
-// Add these interfaces at the top
 interface StreamingInfo {
   embedUrl: string;
   isEmbed: boolean;
-  currentTime?: number;
-  progress?: number;
 }
 
 interface PlaybackState {
-  selectedSeason?: number;
-  selectedEpisode?: number;
   currentTime: number;
+  duration: number;
 }
 
-// Update Media interfaces
+// Base Media interface
 export interface Media {
   id: number;
   title?: string;
-  name?: string;  // For TV shows
+  name?: string;
   overview: string;
   poster_path: string;
   backdrop_path: string;
   release_date?: string;
-  first_air_date?: string;  // For TV shows
+  first_air_date?: string;
   vote_average: number;
+  media_type?: 'movie' | 'tv';
   genre_ids?: number[];
   genres?: Array<{ id: number; name: string }>;
-  media_type?: 'movie' | 'tv';
+  streamingInfo?: StreamingInfo;
+  playbackState?: PlaybackState;
   runtime?: number;
-  streaming?: StreamingInfo;
-  playback?: PlaybackState;
 }
 
+// Movie specific interface
 export interface Movie extends Media {
   title: string;
   release_date: string;
 }
 
+// TV Show specific interface
 export interface TVShow extends Media {
   name: string;
   first_air_date: string;
+  number_of_seasons?: number;
+  number_of_episodes?: number;
   seasons?: Array<{
     season_number: number;
     episode_count: number;
@@ -57,107 +60,139 @@ export interface TVShow extends Media {
 }
 
 interface MoviesContextType {
-  trendingMovies: Movie[];
-  latestMovies: Movie[];
-  popularMovies: Movie[];
-  topRatedMovies: Movie[];
-  upcomingMovies: Movie[];
-  tvShows: TVShow[];
+  trendingMovies: Media[];
+  latestMovies: Media[];
+  popularMovies: Media[];
+  topRatedMovies: Media[];
+  upcomingMovies: Media[];
+  trendingTVShows: TVShow[];
   popularTVShows: TVShow[];
-  watchlist: (Movie | TVShow)[];
+  topRatedTVShows: TVShow[];
+  latestTVShows: TVShow[];
+  watchlist: Media[];
   isLoading: boolean;
+  addToWatchlist: (movie: Media) => void;
+  removeFromWatchlist: (id: number) => void;
   searchMovies: (query: string) => Promise<void>;
-  addToWatchlist: (media: Movie | TVShow) => void;
-  removeFromWatchlist: (mediaId: number) => void;
-  updatePlaybackState: (mediaId: number, state: PlaybackState) => void;
-  getPlaybackState: (mediaId: number) => PlaybackState | undefined;
 }
 
 const MoviesContext = createContext<MoviesContextType | undefined>(undefined);
 
 export function MoviesProvider({ children }: { children: React.ReactNode }) {
-  const [trendingMovies, setTrendingMovies] = useState<Movie[]>([]);
-  const [latestMovies, setLatestMovies] = useState<Movie[]>([]);
-  const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
-  const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
-  const [upcomingMovies, setUpcomingMovies] = useState<Movie[]>([]);
-  const [tvShows, setTvShows] = useState<TVShow[]>([]);
+  const [trendingMovies, setTrendingMovies] = useState<Media[]>([]);
+  const [latestMovies, setLatestMovies] = useState<Media[]>([]);
+  const [popularMovies, setPopularMovies] = useState<Media[]>([]);
+  const [topRatedMovies, setTopRatedMovies] = useState<Media[]>([]);
+  const [upcomingMovies, setUpcomingMovies] = useState<Media[]>([]);
+  const [trendingTVShows, setTrendingTVShows] = useState<TVShow[]>([]);
   const [popularTVShows, setPopularTVShows] = useState<TVShow[]>([]);
-  const [watchlist, setWatchlist] = useState<(Movie | TVShow)[]>([]);
+  const [topRatedTVShows, setTopRatedTVShows] = useState<TVShow[]>([]);
+  const [latestTVShows, setLatestTVShows] = useState<TVShow[]>([]);
+  const [watchlist, setWatchlist] = useState<Media[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [playbackStates, setPlaybackStates] = useState<Record<number, PlaybackState>>({});
 
   useEffect(() => {
-    const fetchContent = async () => {
+    const fetchInitialData = async () => {
       try {
-        const [latest, popular, topRated, upcoming, tvPopular] = await Promise.all([
+        const [
+          latestData,
+          popularData,
+          topRatedData,
+          upcomingData,
+          popularTVData,
+          topRatedTVData,
+          trendingTVData,
+          latestTVData
+        ] = await Promise.all([
           fetchLatestMovies(),
           fetchPopularMovies(),
           fetchTopRatedMovies(),
           fetchUpcomingMovies(),
-          fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/tv/popular?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`)
-            .then(res => res.json())
-            .then(data => data.results)
+          fetchPopularTVShows(),
+          fetchTopRatedTVShows(),
+          fetchTrendingTVShows(),
+          fetchLatestTVShows()
         ]);
 
-        setLatestMovies(latest);
-        setTrendingMovies(latest); // Using latest as trending for now
-        setPopularMovies(popular);
-        setTopRatedMovies(topRated);
-        setUpcomingMovies(upcoming);
-        setPopularTVShows(tvPopular);
+        setLatestMovies(latestData);
+        setPopularMovies(popularData);
+        setTopRatedMovies(topRatedData);
+        setUpcomingMovies(upcomingData);
+        setPopularTVShows(popularTVData);
+        setTopRatedTVShows(topRatedTVData);
+        setTrendingTVShows(trendingTVData);
+        setLatestTVShows(latestTVData);
+
+        // Set trending to be a mix of movies and TV shows
+        setTrendingMovies([...popularData.slice(0, 10), ...topRatedData.slice(0, 10)]);
       } catch (error) {
-        console.error('Error fetching content:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchContent();
+    fetchInitialData();
+
+    // Load watchlist from localStorage
+    const savedWatchlist = localStorage.getItem('watchlist');
+    if (savedWatchlist) {
+      setWatchlist(JSON.parse(savedWatchlist));
+    }
   }, []);
 
+  // Save watchlist to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('watchlist', JSON.stringify(watchlist));
+  }, [watchlist]);
+
+  const addToWatchlist = (movie: Media) => {
+    setWatchlist((prev) => {
+      if (!prev.some((m) => m.id === movie.id)) {
+        return [...prev, movie];
+      }
+      return prev;
+    });
+  };
+
+  const removeFromWatchlist = (id: number) => {
+    setWatchlist((prev) => prev.filter((movie) => movie.id !== id));
+  };
+
   const searchMovies = async (query: string) => {
-    if (!query) return;
-    const results = await searchContent(query);
-    setTrendingMovies(results);
-  };
-
-  const addToWatchlist = (media: Movie | TVShow) => {
-    setWatchlist(prev => [...prev, media]);
-  };
-
-  const removeFromWatchlist = (mediaId: number) => {
-    setWatchlist(prev => prev.filter(media => media.id !== mediaId));
-  };
-
-  const updatePlaybackState = (mediaId: number, state: PlaybackState) => {
-    setPlaybackStates(prev => ({
-      ...prev,
-      [mediaId]: state
-    }));
-  };
-
-  const getPlaybackState = (mediaId: number) => {
-    return playbackStates[mediaId];
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&query=${query}`
+      );
+      const data = await response.json();
+      setTrendingMovies(data.results);
+    } catch (error) {
+      console.error('Error searching movies:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <MoviesContext.Provider value={{
-      trendingMovies,
-      latestMovies,
-      popularMovies,
-      topRatedMovies,
-      upcomingMovies,
-      tvShows,
-      popularTVShows,
-      watchlist,
-      isLoading,
-      searchMovies,
-      addToWatchlist,
-      removeFromWatchlist,
-      updatePlaybackState,
-      getPlaybackState,
-    }}>
+    <MoviesContext.Provider
+      value={{
+        trendingMovies,
+        latestMovies,
+        popularMovies,
+        topRatedMovies,
+        upcomingMovies,
+        trendingTVShows,
+        popularTVShows,
+        topRatedTVShows,
+        latestTVShows,
+        watchlist,
+        isLoading,
+        addToWatchlist,
+        removeFromWatchlist,
+        searchMovies,
+      }}
+    >
       {children}
     </MoviesContext.Provider>
   );

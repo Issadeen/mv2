@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Movie } from '@/app/context/MoviesContext';
+import { Media, Movie, TVShow } from '@/app/context/MoviesContext';
 import { useMovies } from '@/app/context/MoviesContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaHeart, FaRegHeart, FaPlay, FaClock, FaStar, FaCalendar } from 'react-icons/fa';
@@ -11,10 +11,16 @@ import ErrorDisplay from '@/app/components/ErrorDisplay';
 import LoadingSpinner from '@/app/components/LoadingSpinner';
 import { useRouter, useParams } from 'next/navigation';
 
-interface MovieOrTVShow extends Movie {
-  media_type?: 'movie' | 'tv';
-  name?: string;  // For TV shows
-  first_air_date?: string;  // For TV shows
+interface MovieOrTVShow extends Media {
+  media_type: 'movie' | 'tv';
+  title?: string;
+  name?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  runtime?: number;
+  overview: string;
+  genres?: Array<{ id: number; name: string }>;
   seasons?: Array<{
     season_number: number;
     episode_count: number;
@@ -93,9 +99,12 @@ export default function WatchPage() {
   const [similarMovies, setSimilarMovies] = useState<Movie[]>([]);
   const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
   const [content, setContent] = useState<MovieOrTVShow | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
+
+  // Add these new states for TV shows
+  const [seasons, setSeasons] = useState<any[]>([]);
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
-  const [showInfo, setShowInfo] = useState(false);
 
   const updatePlaybackState = (contentId: number, state: number) => {
     // Store playback state in localStorage
@@ -116,17 +125,24 @@ export default function WatchPage() {
         if (!response.ok) throw new Error('Content not found');
         const data = await response.json();
         setContent({ ...data, media_type: mediaType });
-        setLoadingProgress(60);
-
-        // Fetch streaming URL with proper params
-        const streamData = await fetchStreamingUrls(
-          Number(id), 
-          mediaType as 'movie' | 'tv',
-          mediaType === 'tv' ? selectedSeason : undefined,
-          mediaType === 'tv' ? selectedEpisode : undefined
-        );
-        if (!streamData) throw new Error('No streaming sources found');
-        setStreamingData(streamData);
+        
+        // If it's a TV show, get the seasons data
+        if (mediaType === 'tv' && data.seasons) {
+          setSeasons(data.seasons);
+          // Get the streaming URL with season/episode
+          const streamData = await fetchStreamingUrls(
+            Number(id),
+            'tv',
+            selectedSeason,
+            selectedEpisode
+          );
+          setStreamingData(streamData);
+        } else {
+          // For movies, get the streaming URL normally
+          const streamData = await fetchStreamingUrls(Number(id), 'movie');
+          setStreamingData(streamData);
+        }
+        
         setLoadingProgress(80);
 
         // Fetch similar and recommended content
@@ -196,14 +212,17 @@ export default function WatchPage() {
       {/* Content Information - Always visible below player */}
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8 text-gray-100">
         {/* Episode Selection for TV Shows */}
-        {content?.media_type === 'tv' && content.seasons && (
+        {mediaType === 'tv' && seasons && seasons.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2 sm:gap-4 bg-slate-800/50 p-2 sm:p-4 rounded-lg">
             <select
               value={selectedSeason}
-              onChange={(e) => setSelectedSeason(Number(e.target.value))}
+              onChange={(e) => {
+                setSelectedSeason(Number(e.target.value));
+                setSelectedEpisode(1); // Reset episode when season changes
+              }}
               className="flex-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white text-sm sm:text-base"
             >
-              {content.seasons.map((season) => (
+              {seasons.map((season) => (
                 <option key={season.season_number} value={season.season_number}>
                   Season {season.season_number}
                 </option>
@@ -214,9 +233,9 @@ export default function WatchPage() {
               onChange={(e) => setSelectedEpisode(Number(e.target.value))}
               className="flex-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white text-sm sm:text-base"
             >
-              {Array.from({ length: content.seasons[selectedSeason - 1]?.episode_count || 0 }, (_, i) => (
+              {Array.from({ length: seasons[selectedSeason - 1]?.episode_count || 0 }, (_, i) => (
                 <option key={i + 1} value={i + 1}>
-                  Ep {i + 1}
+                  Episode {i + 1}
                 </option>
               ))}
             </select>
@@ -226,7 +245,7 @@ export default function WatchPage() {
         {/* Content Details */}
         <div className="bg-slate-800/50 rounded-lg p-3 sm:p-6 mb-4">
           <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-4 text-white">
-            {content?.title || content?.name}
+            {content?.media_type === 'movie' ? content?.title : content?.name}
           </h1>
 
           <div className="flex flex-wrap gap-2 sm:gap-4 mb-2 sm:mb-4 text-gray-300 text-sm sm:text-base">
@@ -237,14 +256,12 @@ export default function WatchPage() {
             <div className="flex items-center">
               <FaCalendar className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
               <span>
-                {content?.release_date
-                  ? new Date(content.release_date).getFullYear()
-                  : content?.first_air_date
-                  ? new Date(content.first_air_date).getFullYear()
-                  : 'N/A'}
+                {content?.media_type === 'movie'
+                  ? content?.release_date && new Date(content.release_date).getFullYear()
+                  : content?.first_air_date && new Date(content.first_air_date).getFullYear()}
               </span>
             </div>
-            {content?.runtime && (
+            {content?.runtime && content.media_type === 'movie' && (
               <div className="flex items-center">
                 <FaClock className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                 <span>{Math.floor(content.runtime / 60)}h {content.runtime % 60}m</span>

@@ -33,7 +33,8 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [latestMovies]);
 
-  const openTrailer = async (movieId: number, title: string) => {
+  const openTrailer = async (movieId: number, title: string | undefined) => {
+    if (!title) return;
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`

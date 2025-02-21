@@ -151,3 +151,52 @@ export const fetchRecommendedMovies = async (movieId: number) => {
   const { data } = await tmdbApi.get<TMDBResponse<Movie>>(`/movie/${movieId}/recommendations`);
   return data.results;
 };
+
+// TV Show specific functions
+export const fetchPopularTVShows = async () => {
+  const { data } = await tmdbApi.get<TMDBResponse<any>>('/tv/popular');
+  return data.results.map(show => ({
+    ...show,
+    title: show.name,
+    release_date: show.first_air_date,
+    media_type: 'tv'
+  }));
+};
+
+export const fetchTopRatedTVShows = async () => {
+  const { data } = await tmdbApi.get<TMDBResponse<any>>('/tv/top_rated');
+  return data.results.map(show => ({
+    ...show,
+    title: show.name,
+    release_date: show.first_air_date,
+    media_type: 'tv'
+  }));
+};
+
+export const fetchTrendingTVShows = async () => {
+  const { data } = await tmdbApi.get<TMDBResponse<any>>('/trending/tv/week');
+  return data.results.map(show => ({
+    ...show,
+    title: show.name,
+    release_date: show.first_air_date,
+    media_type: 'tv'
+  }));
+};
+
+export const fetchLatestTVShows = async () => {
+  const { data } = await tmdbApi.get<TMDBResponse<any>>('/tv/on_the_air');
+  return data.results.map(show => ({
+    ...show,
+    title: show.name,
+    release_date: show.first_air_date,
+    media_type: 'tv'
+  }));
+};
+
+export const fetchTVShowTrailer = async (showId: number) => {
+  const { data } = await tmdbApi.get<TMDBResponse<TMDBVideo>>(`/tv/${showId}/videos`);
+  const trailer = data.results.find(
+    (video: any) => video.type === 'Trailer' && video.site === 'YouTube'
+  );
+  return trailer ? `https://www.youtube.com/embed/${trailer.key}?autoplay=1&rel=0&modestbranding=1` : null;
+};

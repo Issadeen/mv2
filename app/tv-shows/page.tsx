@@ -7,44 +7,55 @@ import { FaHeart, FaRegHeart, FaSearch, FaFilter, FaPlay } from 'react-icons/fa'
 import TrailerModal from '../components/TrailerModal';
 import Link from 'next/link';
 
+const genreMapping: { [key: string]: number } = {
+  action: 10759, // Action & Adventure
+  comedy: 35,
+  drama: 18,
+  scifi: 10765, // Sci-Fi & Fantasy
+  crime: 80,
+  documentary: 99,
+  family: 10751,
+  mystery: 9648
+};
+
 export default function TVShowsPage() {
-  const { watchlist, addToWatchlist, removeFromWatchlist } = useMovies();
-  const [tvShows, setTvShows] = useState<Movie[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { watchlist, addToWatchlist, removeFromWatchlist, popularTVShows, topRatedTVShows, latestTVShows, trendingTVShows } = useMovies();
+  const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
   const [selectedTrailer, setSelectedTrailer] = useState({ url: '', title: '' });
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
 
-  useEffect(() => {
-    const fetchTVShows = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/tv/popular?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
-        );
-        const data = await response.json();
-        setTvShows(data.results);
-      } catch (error) {
-        console.error('Error fetching TV shows:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const categories = [
+    { id: 'all', name: 'All Shows' },
+    { id: 'action', name: 'Action & Adventure' },
+    { id: 'drama', name: 'Drama' },
+    { id: 'comedy', name: 'Comedy' },
+    { id: 'scifi', name: 'Sci-Fi & Fantasy' },
+    { id: 'crime', name: 'Crime' },
+    { id: 'mystery', name: 'Mystery' }
+  ];
 
-    fetchTVShows();
-  }, []);
-
-  const filteredShows = tvShows
-    .filter((show) => show.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredShows = (popularTVShows || [])
+    .filter((show) => {
+      const matchesSearch = (show.title || show.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = activeCategory === 'all' || 
+        (show.genre_ids && show.genre_ids.includes(genreMapping[activeCategory]));
+      return matchesSearch && matchesCategory;
+    })
     .sort((a, b) => {
       if (sortBy === 'newest') {
-        return new Date(b.first_air_date || '').getTime() - new Date(a.first_air_date || '').getTime();
+        const dateA = new Date(b.first_air_date || '').getTime();
+        const dateB = new Date(a.first_air_date || '').getTime();
+        return dateA - dateB;
       }
-      return (b.vote_average || 0) - (a.vote_average || 0);
+      if (sortBy === 'rating') return (b.vote_average || 0) - (a.vote_average || 0);
+      return 0;
     });
 
-  const openTrailer = async (showId: number, title: string) => {
+  const openTrailer = async (showId: number, title: string | undefined) => {
+    if (!title) return;
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/tv/${showId}/videos?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
@@ -98,7 +109,57 @@ export default function TVShowsPage() {
           </div>
         </div>
 
-        {/* Grid */}
+        {/* Filters and Categories */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex space-x-2 overflow-x-auto pb-4 scrollbar-hide">
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setActiveCategory(category.id)}
+                className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 
+                  ${activeCategory === category.id 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'text-gray-300 hover:text-emerald-400 hover:bg-emerald-500/10'}`}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center px-4 py-2 text-sm font-medium text-emerald-400 rounded-full border border-emerald-400/50 hover:bg-emerald-500/10"
+          >
+            <FaFilter className="mr-2" />
+            Filters
+          </button>
+        </div>
+
+        {/* Filters Panel */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mb-6 overflow-hidden p-4 rounded-lg bg-slate-800/50 backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-300">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-1 text-sm bg-slate-700 rounded-md border border-emerald-500/30 focus:border-emerald-500 outline-none"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="rating">Top Rated</option>
+                </select>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* TV Shows Grid */}
         <motion.div 
           layout
           className="grid grid-cols-2 gap-6 py-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
@@ -117,7 +178,7 @@ export default function TVShowsPage() {
                 <div className="relative aspect-[2/3] rounded-lg overflow-hidden">
                   <img
                     src={`https://image.tmdb.org/t/p/w500${show.poster_path}`}
-                    alt={show.name}
+                    alt={show.title}
                     className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-t from-slate-900/95 via-slate-900/50 to-transparent group-hover:opacity-100">
@@ -137,7 +198,7 @@ export default function TVShowsPage() {
                       </button>
                     </div>
                     <div className="absolute inset-0 flex flex-col justify-end p-4">
-                      <h3 className="mb-1 text-lg font-semibold">{show.name}</h3>
+                      <h3 className="mb-1 text-lg font-semibold">{show.title}</h3>
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-sm text-gray-300">
                           {new Date(show.first_air_date || '').getFullYear()}
@@ -157,7 +218,7 @@ export default function TVShowsPage() {
                           </button>
                         </Link>
                         <button
-                          onClick={() => openTrailer(show.id, show.name || '')}
+                          onClick={() => openTrailer(show.id, show.title)}
                           className="w-full px-4 py-2 text-sm font-medium text-white transition-colors rounded-md bg-white/10 hover:bg-white/20 flex items-center justify-center gap-2"
                         >
                           <FaPlay className="w-4 h-4" />

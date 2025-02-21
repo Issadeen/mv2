@@ -4,17 +4,16 @@ import { Dialog, Transition } from '@headlessui/react';
 import { FaSearch, FaTimes } from 'react-icons/fa';
 import { PlayIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
-import { useMovies } from '../context/MoviesContext';
-import { searchContent } from '../services/tmdb';
-import { Movie } from '../context/MoviesContext';
+import { Movie, TVShow, Media } from '../context/MoviesContext';
 
 export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Movie[]>([]);
+  const [results, setResults] = useState<Media[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'tv'>('all');
 
   useEffect(() => {
-    const searchMovies = async () => {
+    const searchMedia = async () => {
       if (query.length < 2) {
         setResults([]);
         return;
@@ -22,8 +21,18 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
       
       setIsLoading(true);
       try {
-        const data = await searchContent(query);
-        setResults(data);
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/search/multi?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&query=${query}`
+        );
+        const data = await response.json();
+        const filteredResults = data.results.filter((item: any) => 
+          item.media_type === 'movie' || item.media_type === 'tv'
+        ).map((item: any) => ({
+          ...item,
+          title: item.title || item.name,
+          release_date: item.release_date || item.first_air_date
+        }));
+        setResults(filteredResults);
       } catch (error) {
         console.error('Search error:', error);
       } finally {
@@ -31,9 +40,14 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
       }
     };
 
-    const debounce = setTimeout(searchMovies, 300);
+    const debounce = setTimeout(searchMedia, 300);
     return () => clearTimeout(debounce);
   }, [query]);
+
+  const filteredResults = results.filter(item => {
+    if (activeTab === 'all') return true;
+    return item.media_type === activeTab;
+  });
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -66,7 +80,7 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
                   <FaSearch className="absolute left-5 top-5 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search movies..."
+                    placeholder="Search movies and TV shows..."
                     className="w-full h-16 pl-14 pr-4 text-lg bg-slate-900/90 backdrop-blur-xl rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -75,39 +89,52 @@ export default function SearchOverlay({ isOpen, onClose }: { isOpen: boolean; on
                 </div>
 
                 <div className="mt-4 bg-slate-900/90 backdrop-blur-xl rounded-2xl">
+                  <div className="flex gap-2 p-2">
+                    {['all', 'movies', 'tv'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab as 'all' | 'movies' | 'tv')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          activeTab === tab
+                            ? 'bg-emerald-500 text-white'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+
                   {isLoading ? (
                     <div className="flex items-center justify-center p-8">
                       <div className="w-8 h-8 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin" />
                     </div>
-                  ) : results.length > 0 ? (
+                  ) : filteredResults.length > 0 ? (
                     <div className="grid gap-4 p-4 grid-cols-1 sm:grid-cols-2">
-                      {results.map((movie) => (
+                      {filteredResults.map((item) => (
                         <Link 
-                          key={movie.id} 
-                          href={`/watch/${movie.id}`}
+                          key={item.id} 
+                          href={`/watch/${item.id}?type=${item.media_type}`}
                           onClick={onClose}
                           className="flex gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors"
                         >
-                          <div className="relative w-24 h-36 flex-shrink-0">
+                          <div className="w-16 h-24 flex-shrink-0">
                             <img
-                              src={`https://image.tmdb.org/t/p/w200${movie.poster_path}`}
-                              alt={movie.title}
-                              className="object-cover w-full h-full rounded-lg"
+                              src={`https://image.tmdb.org/t/p/w200${item.poster_path}`}
+                              alt={item.title || item.name}
+                              className="w-full h-full object-cover rounded-md"
                             />
                           </div>
-                          <div className="flex flex-col flex-grow">
-                            <h3 className="font-semibold">{movie.title}</h3>
-                            <p className="text-sm text-gray-400 line-clamp-2 mt-1">
-                              {movie.overview}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
-                              <span>{movie.release_date?.split('-')[0]}</span>
-                              {movie.vote_average && (
+                          <div className="flex-1">
+                            <h3 className="font-medium mb-1">{item.title || item.name}</h3>
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <span>{new Date(item.release_date || '').getFullYear()}</span>
+                              <span>•</span>
+                              <span className="capitalize">{item.media_type}</span>
+                              {item.vote_average && (
                                 <>
                                   <span>•</span>
-                                  <span className="text-emerald-400">
-                                    ★ {movie.vote_average.toFixed(1)}
-                                  </span>
+                                  <span className="text-emerald-400">★ {item.vote_average.toFixed(1)}</span>
                                 </>
                               )}
                             </div>

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { FaPlay, FaPause, FaExpand, FaCompress, FaVolumeUp, FaVolumeMute, FaInfoCircle } from 'react-icons/fa';
+import { FaPlay, FaPause, FaExpand, FaCompress, FaVolumeUp, FaVolumeMute, FaInfoCircle, FaKeyboard, FaUndo, FaRedo } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -20,6 +20,7 @@ interface VideoPlayerProps {
   content?: any;
   autoPlay?: boolean;
   onSavePlaybackState?: (time: number) => void;
+  onEpisodeComplete?: () => void;
 }
 
 const getFullscreenElement = (): Element | null => {
@@ -108,6 +109,7 @@ export default function VideoPlayer({
   content,
   autoPlay = true,
   onSavePlaybackState,
+  onEpisodeComplete,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -121,6 +123,40 @@ export default function VideoPlayer({
   const [progress, setProgress] = useState(0);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
   const updateInterval = 5000;
+
+  const [lastTapTime, setLastTapTime] = useState({ left: 0, right: 0 });
+  const [showDoubleTapIndicator, setShowDoubleTapIndicator] = useState<'left' | 'right' | null>(null);
+  const [timePreview, setTimePreview] = useState<{ time: number; x: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const containerWidth = e.currentTarget.clientWidth;
+    const touchX = touch.clientX;
+    const side = touchX < containerWidth / 2 ? 'left' : 'right';
+    const now = Date.now();
+
+    if (now - lastTapTime[side] < 300) {
+      // Double tap detected
+      if (videoRef.current) {
+        if (side === 'left') {
+          videoRef.current.currentTime -= 10;
+        } else {
+          videoRef.current.currentTime += 10;
+        }
+        setShowDoubleTapIndicator(side);
+        setTimeout(() => setShowDoubleTapIndicator(null), 500);
+      }
+    }
+    setLastTapTime(prev => ({ ...prev, [side]: now }));
+  };
+
+  const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const position = (e.clientX - rect.left) / rect.width;
+    const time = videoRef.current.duration * position;
+    setTimePreview({ time, x: e.clientX - rect.left });
+  };
 
   // Add control functions
   const togglePlay = () => {
@@ -143,17 +179,27 @@ export default function VideoPlayer({
 
   // Update playback state handler
   const handleTimeUpdate = () => {
-    if (!videoRef.current || !onSavePlaybackState) return;
+    const video = videoRef.current;
+    if (!video) return;
 
-    const currentTime = Date.now();
-    if (currentTime - lastUpdateTime >= updateInterval) {
-      const time = videoRef.current.currentTime;
-      onSavePlaybackState(time);
-      setCurrentTime(time);
-      setProgress((time / videoRef.current.duration) * 100);
-      setLastUpdateTime(currentTime);
+    // Save current time
+    if (onSavePlaybackState) {
+      onSavePlaybackState(video.currentTime);
+    }
+
+    // Check if episode is complete (95% watched)
+    if (onEpisodeComplete && video.currentTime > video.duration * 0.95) {
+      onEpisodeComplete();
     }
   };
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }, [handleTimeUpdate]);
 
   // Controls visibility
   useEffect(() => {
@@ -209,6 +255,54 @@ export default function VideoPlayer({
       document.exitFullscreen();
     }
   };
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!videoRef.current) return;
+      
+      switch (e.key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'f':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'm':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'arrowleft':
+          e.preventDefault();
+          videoRef.current.currentTime -= 10;
+          break;
+        case 'arrowright':
+          e.preventDefault();
+          videoRef.current.currentTime += 10;
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          const newVolume = Math.min(1, (videoRef.current.volume || 0) + 0.1);
+          videoRef.current.volume = newVolume;
+          setIsMuted(newVolume === 0);
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          const reducedVolume = Math.max(0, (videoRef.current.volume || 0) - 0.1);
+          videoRef.current.volume = reducedVolume;
+          setIsMuted(reducedVolume === 0);
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, [togglePlay, toggleFullscreen, toggleMute]);
+
+  // Add keyboard shortcuts info tooltip
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   if (isEmbed) {
     return (
@@ -278,10 +372,39 @@ export default function VideoPlayer({
   return (
     <div 
       ref={containerRef} 
+      onTouchStart={handleTouchStart}
       className={`relative w-full h-full bg-black group touch-none ${
         isControlsVisible ? '' : 'cursor-none'
       }`}
     >
+      {/* Double tap indicators */}
+      <AnimatePresence>
+        {showDoubleTapIndicator && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className={`absolute top-1/2 -translate-y-1/2 ${
+              showDoubleTapIndicator === 'left' ? 'left-12' : 'right-12'
+            } bg-black/80 rounded-full p-4`}
+          >
+            <div className="flex items-center gap-2">
+              {showDoubleTapIndicator === 'left' ? (
+                <>
+                  <FaUndo className="w-6 h-6" />
+                  <span>-10s</span>
+                </>
+              ) : (
+                <>
+                  <FaRedo className="w-6 h-6" />
+                  <span>+10s</span>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <video
         ref={videoRef}
         src={videoUrl}
@@ -364,14 +487,22 @@ export default function VideoPlayer({
                 videoRef.current.currentTime = pos * videoRef.current.duration;
               }
             }}
+            onMouseMove={handleProgressHover}
+            onMouseLeave={() => setTimePreview(null)}
           >
             <motion.div 
               className="absolute h-full bg-emerald-500"
               style={{ width: `${progress}%` }}
               transition={{ duration: 0.1 }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-3 sm:h-3 bg-emerald-400 rounded-full transform scale-0 group-hover:scale-100 transition-transform" />
-            </motion.div>
+            />
+            {timePreview && (
+              <div 
+                className="absolute bottom-full mb-2 -translate-x-1/2 bg-black/90 px-2 py-1 rounded text-xs"
+                style={{ left: timePreview.x }}
+              >
+                {formatTime(timePreview.time)}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -382,12 +513,30 @@ export default function VideoPlayer({
               >
                 {isPlaying ? <FaPause className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaPlay className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
-              <button 
-                onClick={toggleMute} 
-                className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors"
-              >
-                {isMuted ? <FaVolumeMute className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaVolumeUp className="w-4 h-4 sm:w-5 sm:h-5" />}
-              </button>
+              <div className="flex items-center group">
+                <button 
+                  onClick={toggleMute} 
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  {isMuted ? <FaVolumeMute className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaVolumeUp className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
+                <div className="w-0 overflow-hidden group-hover:w-20 transition-all duration-300">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={videoRef.current?.volume || 1}
+                    onChange={(e) => {
+                      if (videoRef.current) {
+                        videoRef.current.volume = parseFloat(e.target.value);
+                        setIsMuted(parseFloat(e.target.value) === 0);
+                      }
+                    }}
+                    className="w-20 h-1 ml-2 accent-emerald-500"
+                  />
+                </div>
+              </div>
               <div className="flex items-center space-x-1 sm:space-x-2">
                 <span className="text-xs sm:text-sm font-medium">
                   {formatTime(currentTime)} / {formatTime(duration)}
@@ -400,6 +549,23 @@ export default function VideoPlayer({
                 className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors"
               >
                 {isFullscreen ? <FaCompress className="w-4 h-4 sm:w-5 sm:h-5" /> : <FaExpand className="w-4 h-4 sm:w-5 sm:h-5" />}
+              </button>
+              <button
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                className="p-1.5 sm:p-2 rounded-full hover:bg-white/10 transition-colors relative group"
+              >
+                <FaKeyboard className="w-4 h-4 sm:w-5 sm:h-5" />
+                {showShortcuts && (
+                  <div className="absolute bottom-full right-0 mb-2 p-3 bg-black/90 rounded-lg text-xs sm:text-sm whitespace-nowrap">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      <span>Space/K</span><span>Play/Pause</span>
+                      <span>F</span><span>Fullscreen</span>
+                      <span>M</span><span>Mute</span>
+                      <span>←/→</span><span>-/+ 10 seconds</span>
+                      <span>↑/↓</span><span>Volume</span>
+                    </div>
+                  </div>
+                )}
               </button>
             </div>
           </div>

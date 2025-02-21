@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMovies, type Movie } from '../context/MoviesContext';
+import { useMovies } from '@/app/context/MoviesContext';
+import { Media } from '@/app/context/MoviesContext';
 import { FaHeart, FaRegHeart, FaSearch, FaFilter } from 'react-icons/fa';
 import TrailerModal from '../components/TrailerModal';
 import { PlayIcon } from '@heroicons/react/24/solid';
@@ -34,19 +35,20 @@ export default function MoviesPage() {
   ];
 
   const filteredMovies = (trendingMovies || [])
-    .filter((movie: Movie) => {
-      const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase());
+    .filter((movie: Media) => {
+      const matchesSearch = (movie.title || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === 'all' || 
         (movie.genre_ids && movie.genre_ids.includes(genreMapping[activeCategory]));
       return matchesSearch && matchesCategory;
     })
-    .sort((a: Movie, b: Movie) => {
+    .sort((a: Media, b: Media) => {
       if (sortBy === 'newest') return (new Date(b.release_date || '')).getTime() - (new Date(a.release_date || '')).getTime();
       if (sortBy === 'rating') return (b.vote_average || 0) - (a.vote_average || 0);
       return 0;
     });
 
-  const openTrailer = async (movieId: number, title: string) => {
+  const openTrailer = async (movieId: number, title: string | undefined) => {
+    if (!title) return;
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
@@ -68,12 +70,14 @@ export default function MoviesPage() {
   };
 
   const toggleWatchlist = (movie: any) => {
-    if (watchlist.some(m => m.id === movie.id)) {
+    if (isInWatchlist(movie.id)) {
       removeFromWatchlist(movie.id);
     } else {
       addToWatchlist(movie);
     }
   };
+
+  const isInWatchlist = (id: number) => watchlist.some((item: Media) => item.id === id);
 
   return (
     <div className="min-h-screen pt-24">
@@ -186,7 +190,7 @@ export default function MoviesPage() {
                         onClick={() => toggleWatchlist(movie)}
                         className="p-2 text-white rounded-full bg-black/50 hover:bg-black/70 transition-colors"
                       >
-                        {watchlist.some(m => m.id === movie.id) ? (
+                        {isInWatchlist(movie.id) ? (
                           <FaHeart className="w-5 h-5 text-emerald-500" />
                         ) : (
                           <FaRegHeart className="w-5 h-5" />

@@ -97,6 +97,11 @@ export default function WatchPage() {
   const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [showInfo, setShowInfo] = useState(false);
 
+  const updatePlaybackState = (contentId: number, state: number) => {
+    // Store playback state in localStorage
+    localStorage.setItem(`playback_${contentId}`, state.toString());
+  };
+
   useEffect(() => {
     const fetchContent = async () => {
       try {
@@ -161,10 +166,10 @@ export default function WatchPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 overflow-y-auto">
-      {/* Video Section */}
-      <div className="sticky top-16 z-10 bg-black">
-        <div className="aspect-video w-full">
+    <div className="relative bg-slate-900 min-h-screen">
+      {/* Video Player Section - Full width and proper height */}
+      <div className="relative w-full bg-black">
+        <div className="w-full aspect-video max-h-[85vh]">
           {streamingData ? (
             <VideoPlayer
               videoUrl={streamingData.embedUrl}
@@ -174,6 +179,11 @@ export default function WatchPage() {
               content={content}
               showInfo={showInfo}
               onToggleInfo={() => setShowInfo(!showInfo)}
+              onSavePlaybackState={(time) => {
+                if (content) {
+                  updatePlaybackState(content.id, time);
+                }
+              }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -183,16 +193,16 @@ export default function WatchPage() {
         </div>
       </div>
 
-      {/* Content Information */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Content Information with dark theme */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-100">
         <div className="flex flex-col gap-6">
           {/* Episode Selection for TV Shows */}
           {content?.media_type === 'tv' && content.seasons && (
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-4 bg-slate-800/50 p-4 rounded-lg">
               <select
                 value={selectedSeason}
                 onChange={(e) => setSelectedSeason(Number(e.target.value))}
-                className="px-3 py-2 bg-slate-700/50 rounded-lg border border-emerald-500/30 focus:border-emerald-500 outline-none"
+                className="px-4 py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white"
               >
                 {content.seasons.map((season) => (
                   <option key={season.season_number} value={season.season_number}>
@@ -203,7 +213,7 @@ export default function WatchPage() {
               <select
                 value={selectedEpisode}
                 onChange={(e) => setSelectedEpisode(Number(e.target.value))}
-                className="px-3 py-2 bg-slate-700/50 rounded-lg border border-emerald-500/30 focus:border-emerald-500 outline-none"
+                className="px-4 py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white"
               >
                 {Array.from({ length: content.seasons[selectedSeason - 1]?.episode_count || 0 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>
@@ -215,17 +225,17 @@ export default function WatchPage() {
           )}
 
           {/* Content Details */}
-          <div>
-            <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-emerald-200">
+          <div className="bg-slate-800/50 rounded-lg p-6">
+            <h1 className="text-4xl font-bold mb-4 text-white">
               {content?.title || content?.name}
             </h1>
 
-            <div className="flex flex-wrap gap-4 mb-4">
+            <div className="flex flex-wrap gap-4 mb-4 text-gray-300">
               <div className="flex items-center text-emerald-400">
                 <FaStar className="w-5 h-5 mr-2" />
                 <span className="text-lg font-semibold">{content?.vote_average?.toFixed(1)}</span>
               </div>
-              <div className="flex items-center text-gray-300">
+              <div className="flex items-center">
                 <FaCalendar className="w-5 h-5 mr-2" />
                 <span>
                   {content?.release_date
@@ -236,7 +246,7 @@ export default function WatchPage() {
                 </span>
               </div>
               {content?.runtime && (
-                <div className="flex items-center text-gray-300">
+                <div className="flex items-center">
                   <FaClock className="w-5 h-5 mr-2" />
                   <span>{Math.floor(content.runtime / 60)}h {content.runtime % 60}m</span>
                 </div>
@@ -259,26 +269,26 @@ export default function WatchPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Recommendations */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {similarMovies.length > 0 && (
-          <MovieSection 
-            title={`Similar ${content.media_type === 'tv' ? 'Shows' : 'Movies'}`} 
-            movies={similarMovies} 
-            getMediaLink={getMediaLink}
-            router={router}
-          />
-        )}
-        {recommendedMovies.length > 0 && (
-          <MovieSection 
-            title="You May Also Like" 
-            movies={recommendedMovies} 
-            getMediaLink={getMediaLink}
-            router={router}
-          />
-        )}
+        {/* Similar and Recommended Content */}
+        <div className="mt-8 space-y-8">
+          {similarMovies.length > 0 && (
+            <MovieSection 
+              title={`Similar ${content?.media_type === 'tv' ? 'Shows' : 'Movies'}`} 
+              movies={similarMovies} 
+              getMediaLink={getMediaLink}
+              router={router}
+            />
+          )}
+          {recommendedMovies.length > 0 && (
+            <MovieSection 
+              title="You May Also Like" 
+              movies={recommendedMovies} 
+              getMediaLink={getMediaLink}
+              router={router}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

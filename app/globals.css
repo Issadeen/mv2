@@ -156,3 +156,56 @@ iframe {
   position: relative;
   z-index: 1;
 }
+
+/* Enhanced TV display optimizations */
+.tv-player-container {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure proper iframe sizing for TV */
+.tv-player-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* TV-specific media query */
+@media screen and (min-width: 1920px) {
+  .tv-player-container {
+    padding: 0;
+    margin: 0;
+  }
+
+  .video-wrapper {
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+  }
+}
+
+/* Fix for WebOS TV */
+@media screen and (min-width: 1920px) and (min-height: 1080px) {
+  body {
+    overflow: hidden;
+  }
+  
+  .tv-player-container {
+    position: fixed;
+    height: 100vh;
+    max-height: 100vh;
+  }
+}

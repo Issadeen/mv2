@@ -120,6 +120,7 @@ export default function WatchPage() {
   useEffect(() => {
     const fetchContent = async () => {
       try {
+        if (!id) return; // Prevent fetch if id is not available
         setIsLoading(true);
         setError(null);
         setLoadingProgress(30);
@@ -169,7 +170,7 @@ export default function WatchPage() {
     };
 
     fetchContent();
-  }, [id, mediaType, selectedSeason, selectedEpisode]);
+  }, [id, mediaType, selectedSeason, selectedEpisode]); // Add proper dependencies
 
   if (isLoading) {
     return (
@@ -189,9 +190,9 @@ export default function WatchPage() {
 
   return (
     <div className="relative bg-slate-900 min-h-screen">
-      {/* Video Player Section - Fixed to top only initially */}
-      <div className="relative w-full bg-black">
-        <div className="w-full aspect-video max-h-[85vh]">
+      {/* Video Player Section - Optimized for TV displays */}
+      <div className="relative w-full bg-black min-h-screen">
+        <div className="w-full h-screen max-h-screen">
           {streamingData ? (
             <VideoPlayer
               videoUrl={streamingData.embedUrl}
@@ -215,8 +216,8 @@ export default function WatchPage() {
         </div>
       </div>
 
-      {/* Content Information - Always visible below player */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8 text-gray-100">
+      {/* Content Information - Adjusted for better TV visibility */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Episode Selection for TV Shows */}
         {mediaType === 'tv' && seasons && seasons.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2 sm:gap-4 bg-slate-800/50 p-2 sm:p-4 rounded-lg">

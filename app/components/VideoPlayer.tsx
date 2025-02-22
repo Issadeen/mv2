@@ -22,6 +22,7 @@ interface VideoPlayerProps {
   onSavePlaybackState?: (time: number) => void;
   onEpisodeComplete?: () => void;
   error?: string;  // Add error prop
+  onError?: () => void;  // Add this line
 }
 
 const getFullscreenElement = (): Element | null => {
@@ -113,6 +114,61 @@ export default function VideoPlayer({
   onEpisodeComplete,
   error, // Add error prop
 }: VideoPlayerProps) {
+  const [retryCount, setRetryCount] = useState(0);
+  const [internalError, setInternalError] = useState<string | null>(null);
+  const maxRetries = 3;
+
+  const handleRetry = () => {
+    if (retryCount < maxRetries) {
+      setRetryCount(prev => prev + 1);
+      setInternalError(null);
+      // Force reload the iframe or video source
+      if (videoRef.current) {
+        const currentUrl = videoUrl;
+        if (currentUrl) {
+          videoRef.current.src = '';
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.src = currentUrl;
+              videoRef.current.load();
+            }
+          }, 1000);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (videoUrl) {
+      setInternalError(null);
+      setRetryCount(0);
+    }
+  }, [videoUrl]);
+
+  // Add error handling for the iframe
+  const handleIframeError = () => {
+    setInternalError('Video playback error. Click to retry.');
+    if (retryCount < maxRetries) {
+      handleRetry();
+    }
+  };
+
+  // Add automatic retry on black screen
+  useEffect(() => {
+    let checkBlackScreen: NodeJS.Timeout;
+    
+    if (isEmbed && videoUrl) {
+      checkBlackScreen = setTimeout(() => {
+        handleRetry();
+      }, 10000); // Wait 10 seconds before retrying
+    }
+
+    return () => {
+      if (checkBlackScreen) {
+        clearTimeout(checkBlackScreen);
+      }
+    };
+  }, [isEmbed, videoUrl]);
 
   // Don't render video element if no URL
   if (!videoUrl) return null;
@@ -323,7 +379,7 @@ export default function VideoPlayer({
             >
               <LoadingSpinner size="lg" />
             </motion.div>
-          ) : error || !videoUrl ? (
+          ) : internalError || error || !videoUrl ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -331,12 +387,12 @@ export default function VideoPlayer({
               className="absolute inset-0 flex items-center justify-center bg-black/80"
             >
               <div className="text-center px-4">
-                <p className="text-red-400 mb-4">{error || "This content is currently unavailable"}</p>
+                <p className="text-red-400 mb-4">{internalError || error || "Video playback error"}</p>
                 <button
-                  onClick={() => window.location.reload()}
-                  className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                  onClick={handleRetry}
+                  className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
                 >
-                  Try Again
+                  Retry Playback
                 </button>
               </div>
             </motion.div>
@@ -353,7 +409,7 @@ export default function VideoPlayer({
                 allowFullScreen
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 style={{ border: 'none' }}
-                onError={() => setErrorState('Failed to load video')}
+                onError={handleIframeError}
               />
               
               {/* Fullscreen button */}

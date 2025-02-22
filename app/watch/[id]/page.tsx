@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Media, Movie, TVShow } from '@/app/context/MoviesContext';
 import { useMovies } from '@/app/context/MoviesContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -117,60 +117,68 @@ export default function WatchPage() {
     localStorage.setItem(`playback_${contentId}`, state.toString());
   };
 
-  useEffect(() => {
-    const fetchContent = async () => {
-      try {
-        if (!id) return; // Prevent fetch if id is not available
-        setIsLoading(true);
-        setError(null);
-        setLoadingProgress(30);
+  const fetchContent = useCallback(async () => {
+    try {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      setLoadingProgress(30);
 
-        // Fetch movie/show details
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${mediaType}/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
-        );
-        if (!response.ok) throw new Error('Content not found');
-        const data = await response.json();
-        setContent({ ...data, media_type: mediaType });
-        
-        // If it's a TV show, get the seasons data
-        if (mediaType === 'tv' && data.seasons) {
-          setSeasons(data.seasons);
-          // Get the streaming URL with season/episode
-          const streamData = await fetchStreamingUrls(
-            Number(id),
-            'tv',
-            selectedSeason,
-            selectedEpisode
-          );
-          setStreamingData(streamData);
-        } else {
-          // For movies, get the streaming URL normally
-          const streamData = await fetchStreamingUrls(Number(id), 'movie');
-          setStreamingData(streamData);
-        }
-        
-        setLoadingProgress(80);
+      // Fetch movie/show details
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${mediaType}/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
+      );
+      if (!response.ok) throw new Error('Content not found');
+      const data = await response.json();
+      setContent({ ...data, media_type: mediaType });
+      
+      setLoadingProgress(50);
 
-        // Fetch similar and recommended content based on media type
-        const [similar, recommended] = await Promise.all([
-          fetchSimilarContent(Number(id), mediaType),
-          fetchRecommendedContent(Number(id), mediaType)
-        ]);
-
-        setSimilarMovies(similar);
-        setRecommendedMovies(recommended);
-        setLoadingProgress(100);
-      } catch (error) {
-        console.error('Error:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load content');
-      } finally {
-        setIsLoading(false);
+      // If it's a TV show, get the seasons data
+      if (mediaType === 'tv' && data.seasons) {
+        setSeasons(data.seasons);
       }
-    };
 
+      // Get streaming URL
+      const streamData = await fetchStreamingUrls(
+        Number(id),
+        mediaType,
+        mediaType === 'tv' ? selectedSeason : undefined,
+        mediaType === 'tv' ? selectedEpisode : undefined
+      );
+
+      if (!streamData.embedUrl) {
+        throw new Error('No streaming source available');
+      }
+
+      setStreamingData(streamData);
+      setLoadingProgress(80);
+
+      // Fetch similar and recommended content based on media type
+      const [similar, recommended] = await Promise.all([
+        fetchSimilarContent(Number(id), mediaType),
+        fetchRecommendedContent(Number(id), mediaType)
+      ]);
+
+      setSimilarMovies(similar);
+      setRecommendedMovies(recommended);
+      setLoadingProgress(100);
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load content');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, mediaType, selectedSeason, selectedEpisode]);
+
+  useEffect(() => {
     fetchContent();
-  }, [id, mediaType, selectedSeason, selectedEpisode]); // Add proper dependencies
+  }, [fetchContent]);
+
+  // Add retry mechanism for streaming failures
+  const handleStreamingError = useCallback(() => {
+    fetchContent();
+  }, [fetchContent]);
 
   if (isLoading) {
     return (
@@ -207,6 +215,8 @@ export default function WatchPage() {
                   updatePlaybackState(content.id, time);
                 }
               }}
+              error={streamingData.error}
+              onError={handleStreamingError}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">

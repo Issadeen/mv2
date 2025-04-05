@@ -209,3 +209,323 @@ iframe {
     max-height: 100vh;
   }
 }
+
+/* WebOS TV specific optimizations */
+@media screen and (min-width: 1920px) and (-webkit-device-pixel-ratio: 1) {
+  .tv-optimized-player {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+  }
+
+  .tv-optimized-player iframe {
+    width: 100vw !important;
+    height: 100vh !important;
+    transform: none !important;
+    top: 0 !important;
+    left: 0 !important;
+    position: fixed !important;
+  }
+
+  /* Prevent scrolling on WebOS */
+  body.webos {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* Force hardware acceleration for better performance on TV */
+.tv-optimized-player iframe {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+}
+
+/* Ensure content doesn't overlay player on TV */
+@media screen and (min-width: 1920px) {
+  .tv-content-wrapper {
+    display: none;
+  }
+  
+  .player-active {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+  }
+}
+
+/* TV device optimizations */
+html.tv-device {
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+body.tv-optimized {
+  overflow: hidden;
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+  -webkit-overflow-scrolling: none;
+}
+
+.tv-optimized-player {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000;
+  transform-style: preserve-3d;
+  contain: layout size paint;
+}
+
+/* Prevent layout shifts on TV */
+.tv-optimized-player iframe {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: none !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 9999 !important;
+}
+
+/* Disable animations on TV devices to prevent refresh triggers */
+@media screen and (min-width: 1920px) {
+  html.tv-device * {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .tv-device .motion-safe\:animate-fade,
+  .tv-device .motion-safe\:animate-slide,
+  .tv-device .motion-safe\:animate-scale {
+    animation: none !important;
+  }
+}
+
+/* Prevent touch events from triggering refreshes on TV */
+.tv-optimized * {
+  touch-action: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* WebOS TV specific optimizations */
+.webos-player {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000;
+  -webkit-perspective: 1000;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  contain: layout size paint style;
+  isolation: isolate;
+}
+
+.webos-player iframe {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 9999 !important;
+  background: #000 !important;
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+
+/* Prevent WebOS refresh triggers */
+html.webos-tv {
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -webkit-overflow-scrolling: none !important;
+  overflow: hidden !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  position: fixed !important;
+  width: 100vw !important;
+}
+
+body.webos-tv {
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -webkit-overflow-scrolling: none !important;
+  overflow: hidden !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  position: fixed !important;
+  width: 100vw !important;
+}
+
+/* Disable all transitions and animations on WebOS */
+html.webos-tv * {
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Force hardware acceleration for WebOS */
+.webos-player * {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+/* Prevent content shift on WebOS */
+@media screen and (min-width: 1920px) {
+  html.webos-tv .content-wrapper,
+  html.webos-tv .nav-wrapper {
+    display: none !important;
+  }
+  
+  html.webos-tv .webos-player {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+  }
+}
+
+/* WebOS TV specific optimizations */
+html[data-os="webos"] {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  position: fixed !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+}
+
+body[data-os="webos"] {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  position: fixed !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+}
+
+.webos-player {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  background: #000 !important;
+  overflow: hidden !important;
+}
+
+.webos-player iframe {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  pointer-events: auto !important;
+  touch-action: none !important;
+  background-color: #000 !important;
+}
+
+/* WebOS TV scrolling optimizations */
+.webos-scroll-container {
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth !important;
+  overscroll-behavior-y: none !important;
+  -webkit-overscroll-behavior-y: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+  perspective: 1000 !important;
+  -webkit-perspective: 1000 !important;
+}
+
+.webos-scroll-container::-webkit-scrollbar {
+  width: 8px !important;
+  background-color: transparent !important;
+}
+
+.webos-scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 4px !important;
+}
+
+.webos-scroll-container::-webkit-scrollbar-track {
+  background-color: transparent !important;
+}
+
+/* Handle WebOS TV content layout */
+html[data-os="webos"] .webos-scroll-container > * {
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+}
+
+html[data-os="webos"] .webos-scroll-container {
+  padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+}
+
+/* Override any conflicting styles */
+html[data-os="webos"],
+html[data-os="webos"] body {
+  position: fixed !important;
+  overflow: hidden !important;
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-text-size-adjust: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Fix for video player in WebOS scroll container */
+html[data-os="webos"] .webos-player {
+  position: fixed !important;
+  z-index: 9999 !important;
+}

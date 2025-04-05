@@ -104,59 +104,116 @@ interface StreamingSource {
   getUrl: () => string;
 }
 
+// Add TV-specific network configuration
+const setupTVNetwork = () => {
+  if (/\b(webos|tizen|vidaa|hbbtv)\b/i.test(navigator.userAgent.toLowerCase())) {
+    return {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      mode: 'cors' as RequestMode,
+      credentials: 'omit' as RequestCredentials,
+      redirect: 'follow' as RequestRedirect,
+    };
+  }
+  return {};
+};
+
 export const fetchStreamingUrls = async (
   tmdbId: number, 
   mediaType: 'movie' | 'tv' = 'movie',
   season?: number,
   episode?: number
 ) => {
+  const cacheKey = `stream-${tmdbId}-${mediaType}-${season}-${episode}`;
+  const isWebOS = /\b(webos)\b/i.test(navigator.userAgent.toLowerCase());
+  
   try {
-    const sources: StreamingSource[] = [
-      {
-        base: 'https://vidsrc.xyz/embed',
-        getUrl: (): string => mediaType === 'tv'
-          ? `${sources[0].base}/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`
-          : `${sources[0].base}/movie?tmdb=${tmdbId}`
-      },
-      {
-        base: 'https://vidsrc.to/embed',
-        getUrl: (): string => mediaType === 'tv'
-          ? `${sources[1].base}/tv/${tmdbId}/${season}/${episode}`
-          : `${sources[1].base}/movie/${tmdbId}`
-      },
-      {
-        base: 'https://2embed.org/embed',
-        getUrl: (): string => mediaType === 'tv'
-          ? `${sources[2].base}/series?tmdb=${tmdbId}&s=${season}&e=${episode}`
-          : `${sources[2].base}/movie?tmdb=${tmdbId}`
-      }
+    const sources = [
+      'https://vidsrc.to/embed',
+      'https://www.vidplay.site/e',
+      'https://2embed.org/embed',
+      'https://vidsrc.xyz/embed',
+      'https://multiembed.mov/directstream.php'
     ];
 
-    // Try each source until one works
-    for (const source of sources) {
-      try {
-        const url = source.getUrl();
-        const response = await fetch(url, { 
-          method: 'HEAD',
-          signal: AbortSignal.timeout(5000) // Using AbortSignal instead of timeout option
-        });
-        
-        if (response.ok) {
-          return { embedUrl: url, isEmbed: true };
-        }
-      } catch (error) {
-        console.warn(`Source ${source.base} unavailable, trying next...`);
-        continue;
+    const generateUrl = (base: string): string => {
+      if (mediaType === 'tv') {
+        return `${base}/tv?tmdb=${tmdbId}&s=${season}&e=${episode}`;
       }
+      return `${base}/movie?tmdb=${tmdbId}`;
+    };
+
+    // For WebOS, use direct source without validation to prevent refresh loops
+    if (isWebOS) {
+      const sourceUrl = generateUrl(sources[0]);
+      return { 
+        embedUrl: sourceUrl,
+        isEmbed: true,
+        isWebOS: true,
+        useWebView: true
+      };
     }
 
-    throw new Error('No available streaming sources found');
+    // For non-WebOS devices, continue with normal source checking
+    const sourcePromises = sources.map(base => 
+      new Promise<string | null>(async (resolve) => {
+        try {
+          const url = generateUrl(base);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+          const response = await fetch(url, { 
+            method: 'HEAD',
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            resolve(url);
+          } else {
+            resolve(null);
+          }
+        } catch (error) {
+          resolve(null);
+        }
+      })
+    );
+
+    const results = await Promise.all(sourcePromises);
+    const validUrl = results.find(url => url !== null);
+
+    if (validUrl) {
+      const result = { embedUrl: validUrl, isEmbed: true };
+      sessionStorage.setItem(cacheKey, JSON.stringify(result));
+      return result;
+    }
+
+    // Fallback to first source
+    const sourceUrl = generateUrl(sources[0]);
+    const result = { embedUrl: sourceUrl, isEmbed: true };
+    if (!isWebOS) {
+      sessionStorage.setItem(cacheKey, JSON.stringify(result));
+    }
+    return result;
+
   } catch (error) {
     console.error('Error creating streaming URL:', error);
-    return {
-      error: 'Content is temporarily unavailable. Please try again or choose a different title.',
-      embedUrl: null,
-      isEmbed: true
+    const fallbackBase = isWebOS ? 'https://vidsrc.to/embed' : 'https://www.vidplay.site/e';
+    const fallbackUrl = `${fallbackBase}/${mediaType === 'tv' ? 'tv' : 'movie'}?tmdb=${tmdbId}${mediaType === 'tv' ? `&s=${season}&e=${episode}` : ''}`;
+    
+    return { 
+      embedUrl: fallbackUrl,
+      isEmbed: true,
+      isWebOS,
+      useWebView: isWebOS
     };
   }
 };

@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import Navbar from './components/Navbar'
 import { MoviesProvider } from './context/MoviesContext'
 import Providers from './providers'
+import ClientLayout from './ClientLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,12 +19,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-slate-900 text-white min-h-screen`}>
+    <html lang="en" suppressHydrationWarning data-tv-device>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      </head>
+      <body className={`${inter.className} bg-slate-900 text-white min-h-screen overflow-hidden`}>
         <Providers>
           <MoviesProvider>
-            <Navbar />
-            <main className="min-h-screen">{children}</main>
+            <ClientLayout>
+              <Navbar />
+              <main className="min-h-screen">{children}</main>
+            </ClientLayout>
           </MoviesProvider>
         </Providers>
       </body>

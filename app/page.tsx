@@ -195,17 +195,14 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* Movie Indicators */}
-        <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 flex space-x-3">
+        {/* Carousel indicators */}
+        <div className="carousel-indicators">
           {latestMovies.slice(0, 5).map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentMovie(index)}
-              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                currentMovie === index 
-                  ? 'bg-emerald-400 w-8' 
-                  : 'bg-gray-400/50 hover:bg-gray-400'
-              }`}
+              className={`carousel-indicator ${currentMovie === index ? 'active' : ''}`}
+              aria-label={`Go to slide ${index + 1}`}
             />
           ))}
         </div>

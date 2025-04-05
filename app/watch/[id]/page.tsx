@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Media, Movie, TVShow } from '@/app/context/MoviesContext';
 import { useMovies } from '@/app/context/MoviesContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +10,7 @@ import { fetchStreamingUrls, fetchSimilarContent, fetchRecommendedContent } from
 import ErrorDisplay from '@/app/components/ErrorDisplay';
 import LoadingSpinner from '@/app/components/LoadingSpinner';
 import { useRouter, useParams } from 'next/navigation';
+import TVErrorBoundaryWrapper from '@/app/components/TVErrorBoundary';
 
 interface MovieOrTVShow extends Media {
   media_type: 'movie' | 'tv';
@@ -90,62 +91,51 @@ interface StreamingData {
 export default function WatchPage() {
   const router = useRouter();
   const params = useParams();
-  
-  const getMediaLink = (id: number, type?: string) => `/watch/${id}?type=${type || 'movie'}`;
   const id = params.id as string;
-  const searchParams = new URLSearchParams(window.location.search);
-  const mediaType = (searchParams.get('type') || 'movie') as 'movie' | 'tv';
-  const [movie, setMovie] = useState<Movie | null>(null);
+  const urlParams = useMemo(() => new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''), []);
+  const mediaType = useMemo(() => (urlParams.get('type') || 'movie') as 'movie' | 'tv', [urlParams]);
+  
+  const [content, setContent] = useState<MovieOrTVShow | null>(null);
   const [streamingData, setStreamingData] = useState<StreamingData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const { watchlist, addToWatchlist, removeFromWatchlist } = useMovies();
-  const isInWatchlist = watchlist.some(m => m.id === Number(id));
-  const [similarMovies, setSimilarMovies] = useState<Movie[]>([]);
-  const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
-  const [content, setContent] = useState<MovieOrTVShow | null>(null);
-  const [showInfo, setShowInfo] = useState(false);
-
-  // Add these new states for TV shows
   const [seasons, setSeasons] = useState<any[]>([]);
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
+  const [showInfo, setShowInfo] = useState(false);
+  const [similarMovies, setSimilarMovies] = useState<Movie[]>([]);
+  const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
 
-  const updatePlaybackState = (contentId: number, state: number) => {
-    // Store playback state in localStorage
-    localStorage.setItem(`playback_${contentId}`, state.toString());
-  };
+  const { watchlist, addToWatchlist, removeFromWatchlist } = useMovies();
+  const isInWatchlist = useMemo(() => watchlist.some(m => m.id === Number(id)), [watchlist, id]);
 
+  // Memoize content fetching function
   const fetchContent = useCallback(async () => {
+    if (!id || !mediaType) return;
+
     try {
-      if (!id) return;
-      setIsLoading(true);
       setError(null);
-      setLoadingProgress(30);
-
-      // Fetch movie/show details
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${mediaType}/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
-      );
-      if (!response.ok) throw new Error('Content not found');
-      const data = await response.json();
-      setContent({ ...data, media_type: mediaType });
       
-      setLoadingProgress(50);
-
-      // If it's a TV show, get the seasons data
-      if (mediaType === 'tv' && data.seasons) {
-        setSeasons(data.seasons);
+      // Only show loading state on initial load
+      if (!content) {
+        setIsLoading(true);
+        setLoadingProgress(30);
       }
 
-      // Get streaming URL
-      const streamData = await fetchStreamingUrls(
-        Number(id),
-        mediaType,
-        mediaType === 'tv' ? selectedSeason : undefined,
-        mediaType === 'tv' ? selectedEpisode : undefined
-      );
+      const [contentData, streamData] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_TMDB_BASE_URL}/${mediaType}/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`).then(res => res.json()),
+        fetchStreamingUrls(Number(id), mediaType, selectedSeason, selectedEpisode)
+      ]);
+
+      if (!contentData) throw new Error('Content not found');
+      
+      setContent({ ...contentData, media_type: mediaType });
+      setLoadingProgress(50);
+
+      if (mediaType === 'tv' && contentData.seasons) {
+        setSeasons(contentData.seasons);
+      }
 
       if (!streamData.embedUrl) {
         throw new Error('No streaming source available');
@@ -154,7 +144,7 @@ export default function WatchPage() {
       setStreamingData(streamData);
       setLoadingProgress(80);
 
-      // Fetch similar and recommended content based on media type
+      // Fetch similar and recommended content in parallel
       const [similar, recommended] = await Promise.all([
         fetchSimilarContent(Number(id), mediaType),
         fetchRecommendedContent(Number(id), mediaType)
@@ -163,6 +153,7 @@ export default function WatchPage() {
       setSimilarMovies(similar);
       setRecommendedMovies(recommended);
       setLoadingProgress(100);
+      setError(null);
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Failed to load content');
@@ -171,16 +162,37 @@ export default function WatchPage() {
     }
   }, [id, mediaType, selectedSeason, selectedEpisode]);
 
+  // Initial content fetch
   useEffect(() => {
     fetchContent();
   }, [fetchContent]);
 
-  // Add retry mechanism for streaming failures
+  // Only refetch when season or episode changes for TV shows
+  useEffect(() => {
+    if (mediaType === 'tv' && content) {
+      fetchContent();
+    }
+  }, [selectedSeason, selectedEpisode, mediaType]);
+
+  // Prevent unnecessary re-renders
   const handleStreamingError = useCallback(() => {
     fetchContent();
   }, [fetchContent]);
 
-  if (isLoading) {
+  const handleSeasonChange = useCallback((season: number) => {
+    setSelectedSeason(season);
+    setSelectedEpisode(1);
+  }, []);
+
+  const handleEpisodeChange = useCallback((episode: number) => {
+    setSelectedEpisode(episode);
+  }, []);
+
+  if (!id || !mediaType) {
+    return <ErrorDisplay error="Invalid content URL" />;
+  }
+
+  if (isLoading && !content) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -198,44 +210,40 @@ export default function WatchPage() {
 
   return (
     <div className="relative bg-slate-900 min-h-screen">
-      {/* Video Player Section - Optimized for TV displays */}
       <div className="relative w-full bg-black min-h-screen">
         <div className="w-full h-screen max-h-screen">
-          {streamingData ? (
-            <VideoPlayer
-              videoUrl={streamingData.embedUrl}
-              title={content?.title || content?.name || ''}
-              isEmbed={streamingData.isEmbed}
-              isLoading={isLoading}
-              content={content}
-              showInfo={showInfo}
-              onToggleInfo={() => setShowInfo(!showInfo)}
-              onSavePlaybackState={(time) => {
-                if (content) {
-                  updatePlaybackState(content.id, time);
-                }
-              }}
-              error={streamingData.error}
-              onError={handleStreamingError}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <LoadingSpinner size="lg" />
-            </div>
-          )}
+          <TVErrorBoundaryWrapper>
+            {streamingData ? (
+              <VideoPlayer
+                key={`${mediaType}-${id}-${selectedSeason}-${selectedEpisode}`}
+                videoUrl={streamingData.embedUrl}
+                title={content?.title || content?.name || ''}
+                isEmbed={streamingData.isEmbed}
+                isLoading={isLoading}
+                content={content}
+                showInfo={showInfo}
+                onToggleInfo={() => setShowInfo(!showInfo)}
+                error={streamingData.error}
+                onError={handleStreamingError}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <LoadingSpinner size="lg" />
+              </div>
+            )}
+          </TVErrorBoundaryWrapper>
         </div>
       </div>
 
-      {/* Content Information - Adjusted for better TV visibility */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Only show content info if not on TV */}
+      <div className="tv-content-wrapper">
         {/* Episode Selection for TV Shows */}
         {mediaType === 'tv' && seasons && seasons.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2 sm:gap-4 bg-slate-800/50 p-2 sm:p-4 rounded-lg">
             <select
               value={selectedSeason}
               onChange={(e) => {
-                setSelectedSeason(Number(e.target.value));
-                setSelectedEpisode(1); // Reset episode when season changes
+                handleSeasonChange(Number(e.target.value));
               }}
               className="flex-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white text-sm sm:text-base"
             >
@@ -247,7 +255,7 @@ export default function WatchPage() {
             </select>
             <select
               value={selectedEpisode}
-              onChange={(e) => setSelectedEpisode(Number(e.target.value))}
+              onChange={(e) => handleEpisodeChange(Number(e.target.value))}
               className="flex-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-700 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none text-white text-sm sm:text-base"
             >
               {Array.from({ length: seasons[selectedSeason - 1]?.episode_count || 0 }, (_, i) => (
@@ -315,7 +323,7 @@ export default function WatchPage() {
             <MovieSection 
               title={`Similar ${content?.media_type === 'tv' ? 'Shows' : 'Movies'}`} 
               movies={similarMovies} 
-              getMediaLink={getMediaLink}
+              getMediaLink={(id, type) => `/watch/${id}?type=${type || 'movie'}`}
               router={router}
             />
           )}
@@ -323,7 +331,7 @@ export default function WatchPage() {
             <MovieSection 
               title="You May Also Like" 
               movies={recommendedMovies} 
-              getMediaLink={getMediaLink}
+              getMediaLink={(id, type) => `/watch/${id}?type=${type || 'movie'}`}
               router={router}
             />
           )}

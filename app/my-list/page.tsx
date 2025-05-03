@@ -76,7 +76,7 @@ export default function MyListPage() {
                   <div className="relative w-32 h-48 flex-shrink-0">
                     <img
                       src={`https://image.tmdb.org/t/p/w500${item.poster_path}`}
-                      alt={item.title}
+                      alt={item.title ?? ''}
                       className="object-cover w-full h-full rounded-lg"
                     />
                   </div>

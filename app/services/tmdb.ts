@@ -168,46 +168,24 @@ export const fetchStreamingUrls = async (
   season?: number,
   episode?: number
 ): Promise<StreamingInfo> => {
-  const cacheKey = `stream-${tmdbId}-${mediaType}-${season}-${episode}`;
   const isWebOS = typeof window !== 'undefined' && /\b(webos)\b/i.test(navigator.userAgent.toLowerCase());
 
-  if (!isWebOS && typeof sessionStorage !== 'undefined') {
-    const cachedData = sessionStorage.getItem(cacheKey);
-    if (cachedData) {
-      try {
-        return JSON.parse(cachedData);
-      } catch (e) {
-        console.warn("Failed to parse cached streaming data", e);
-        sessionStorage.removeItem(cacheKey);
-      }
+  // Define the primary source and the final fallback source
+  const primarySourceBase = 'https://vidsrc.to/embed';
+  const fallbackBase = 'https://vidsrc.to/embed'; // Can be the same or different
+
+  const generateUrl = (base: string): string => {
+    if (mediaType === 'tv') {
+      return `${base}/tv/${tmdbId}/${season}/${episode}`;
     }
-  }
+    return `${base}/movie/${tmdbId}`;
+  };
 
   try {
-    const sources = [
-      'https://vidsrc.to/embed',
-      'https://vidsrc.xyz/embed',
-      'https://www.vidplay.site/e',
-      'https://multiembed.mov/directstream.php',
-      'https://moviesapi.club/movie',
-    ];
-
-    const generateUrl = (base: string): string => {
-      if (base.includes('multiembed.mov')) {
-        return `${base}?tmdb=${tmdbId}`;
-      }
-      if (base.includes('moviesapi.club')) {
-        return `${base}/${tmdbId}`;
-      }
-      if (mediaType === 'tv') {
-        return `${base}/tv/${tmdbId}/${season}/${episode}`;
-      }
-      return `${base}/movie/${tmdbId}`;
-    };
-
+    // Special handling for WebOS
     if (isWebOS) {
-      console.log("WebOS detected, using direct source:", sources[0]);
-      const sourceUrl = generateUrl(sources[0]);
+      console.log("WebOS detected, using direct source:", primarySourceBase);
+      const sourceUrl = generateUrl(primarySourceBase);
       return {
         embedUrl: sourceUrl,
         isEmbed: true,
@@ -216,61 +194,27 @@ export const fetchStreamingUrls = async (
       };
     }
 
-    console.log(`Fetching streaming URLs for ${mediaType} ${tmdbId} (S:${season} E:${episode})`);
-    for (const base of sources) {
-      const url = generateUrl(base);
-      console.log("Trying source:", url);
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-        const response = await fetch(url, {
-          method: 'HEAD',
-          signal: controller.signal,
-          mode: 'no-cors',
-          cache: 'no-store',
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.ok || response.type === 'opaqueredirect' || response.status === 200) {
-          console.log("Found valid source:", url);
-          const result = { embedUrl: url, isEmbed: true };
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem(cacheKey, JSON.stringify(result));
-          }
-          return result;
-        } else {
-          console.log(`Source failed (Status: ${response.status}):`, url);
-        }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.log("Source timed out:", url);
-        } else {
-          console.log("Source error:", url, error.message);
-        }
-      }
-    }
-
-    console.warn("No sources validated quickly, falling back to first source:", sources[0]);
-    const fallbackUrl = generateUrl(sources[0]);
-    const fallbackResult = { embedUrl: fallbackUrl, isEmbed: true };
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(cacheKey, JSON.stringify(fallbackResult));
-    }
-    return fallbackResult;
+    // For other platforms, directly return the primary source URL
+    const primaryUrl = generateUrl(primarySourceBase);
+    console.log(`Using primary streaming URL for ${mediaType} ${tmdbId} (S:${season} E:${episode}): ${primaryUrl}`);
+    return {
+      embedUrl: primaryUrl,
+      isEmbed: true,
+      isWebOS: false, // Explicitly false if not WebOS
+      useWebView: false // Explicitly false if not WebOS
+    };
 
   } catch (error) {
+    // Fallback in case of any unexpected error during URL generation
     console.error('Critical error creating streaming URL:', error);
-    const fallbackBase = 'https://vidsrc.to/embed';
-    const finalFallbackUrl = `${fallbackBase}/${mediaType === 'tv' ? 'tv' : 'movie'}/${tmdbId}${mediaType === 'tv' ? `/${season}/${episode}` : ''}`;
+    const finalFallbackUrl = generateUrl(fallbackBase);
     console.error("Using final fallback URL:", finalFallbackUrl);
 
     return {
       embedUrl: finalFallbackUrl,
       isEmbed: true,
-      isWebOS: isWebOS,
-      useWebView: isWebOS
+      isWebOS: isWebOS, // Preserve original WebOS detection status
+      useWebView: isWebOS // Preserve original WebOS detection status
     };
   }
 };

@@ -67,13 +67,19 @@ export default function TrailerModal({ isOpen, onClose, trailerUrl, title }: Tra
                       <div className="w-16 h-16 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin" />
                     </div>
                   )}
-                  <iframe
-                    src={trailerUrl}
-                    className="h-full w-full"
-                    allowFullScreen
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    onLoad={() => setIsLoading(false)}
-                  />
+                  {trailerUrl ? (
+                    <iframe
+                      src={trailerUrl}
+                      className="h-full w-full"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      onLoad={() => setIsLoading(false)}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black">
+                      <p className="text-white">Loading trailer...</p>
+                    </div>
+                  )}
                 </div>
               </Dialog.Panel>
             </Transition.Child>

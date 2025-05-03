@@ -1,18 +1,25 @@
 'use client';
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import { motion } from 'framer-motion';
+import { XMarkIcon } from '@heroicons/react/24/solid';
 
 interface TrailerModalProps {
   isOpen: boolean;
   onClose: () => void;
   trailerUrl: string;
   title: string;
+  isLoading?: boolean; // Add optional isLoading prop
 }
 
 export default function TrailerModal({ isOpen, onClose, trailerUrl, title }: TrailerModalProps) {
   const [isLoading, setIsLoading] = useState(true);
+
+  // Reset loading state when trailerUrl changes or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoading(true);
+    }
+  }, [isOpen, trailerUrl]);
 
   return (
     <Transition show={isOpen} as={Fragment}>
